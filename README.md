@@ -61,3 +61,133 @@ snakemake -j24 --keep-going --rerun-incomplete
 snakemake -j 500 --cluster-config cluster.axiom.json --cluster "sbatch -p {cluster.partition} -t {cluster.time} -c {cluster.CPUs} --mem={cluster.RAM_memory}" --restart-times 3 --keep-going --rerun-incomplete
 
 
+# Simulate test data: an XY system with the sexchroms and one autosome
+
+```
+import numpy as np
+import gzip
+
+n_autosomes = 1
+
+autosomes = []
+for i in range(n_autosomes):
+	autosomes.append( "".join( np.random.choice(["A","C","T","G"], size = 600000, replace = True) ) )
+
+```
+the sexchroms are diverged by a 2 MB region between 2Mbp to 4 Mbp
+
+- Y-hemizygous region 1 Mbp
+- X-hemizygous region 1 Mbp => Y chrom is SHORTER
+- X-Y gametolog region: divergence = 10%
+- PARs on both sides.
+```
+Xchrom = "".join( np.random.choice(["A","C","T","G"], size = 600000, replace = True) )
+
+```
+construct the Ychrom: PAR-X_Y_gametolog_region-Y_hemizygous
+
+1	100000	PAR1
+
+100001	200000	X_Y_gametolog_region
+
+200001	300000	Y-hemizygous
+
+300001	500000	PAR2
+
+
+and therefore the X chrom is: with the PAR2 being 4-6 Mbp on the X, but 3-5 Mb on the Y (because the X-hemiz is larger (2x) than the Y-hemiz region)
+
+1	100000	PAR1
+
+100001	200000	X_Y_gametolog_region
+
+200001	400000	X-hemizygous
+
+400001	600000	PAR2
+
+```
+X_Y_gametolog_region = list( Xchrom[100000:200000] )
+snpsites = np.random.uniform(0, len(X_Y_gametolog_region), size = int(0.1*len(X_Y_gametolog_region)) )
+print len(snpsites)
+for s in snpsites:
+	s = int(s)
+	isnuc = X_Y_gametolog_region[s]
+	newnuc = np.random.choice([ x for x in ["A","C","T","G"] if not x == isnuc])
+	X_Y_gametolog_region[s] = newnuc 
+
+
+X_Y_gametolog_region = "".join(X_Y_gametolog_region)
+Y_hemiz_region = "".join( np.random.choice(["A","C","T","G"], size = 100000, replace = True) ) 
+
+Ychrom = Xchrom[:100000] + X_Y_gametolog_region + Y_hemiz_region + Xchrom[400000:]
+
+
+len(Ychrom)
+len(Xchrom)
+
+
+with open("fakegenome.FEMALE.fa", "w") as O:
+	cnt = 0
+	for chr in autosomes:
+		cnt += 1
+		O.write(">chrom" + str(cnt) + "\n")
+		O.write(chr + "\n")
+	O.write(">chrom_X" + "\n")
+	O.write(Xchrom + "\n")
+
+
+with open("fakegenome.FEMALE.diploid.fa", "w") as O:
+	cnt = 0
+	for chr in autosomes:
+		cnt += 1
+		O.write(">chrom" + str(cnt) + "_1" + "\n")
+		O.write(chr + "\n")
+		O.write(">chrom" + str(cnt) + "_2" + "\n")
+		O.write(chr + "\n")
+	O.write(">chrom_X" + "_1" + "\n")
+	O.write(Xchrom + "\n")
+	O.write(">chrom_X" + "_2" + "\n")
+	O.write(Xchrom + "\n")
+
+
+with open("fakegenome.MALE.fa", "w") as O:
+	cnt = 0
+	for chr in autosomes:
+		cnt += 1
+		O.write(">chrom" + str(cnt) + "\n")
+		O.write(chr + "\n")
+	O.write(">chrom_Y" + "\n")
+	O.write(Ychrom + "\n")
+
+
+with open("fakegenome.MALE.diploid.fa", "w") as O:
+	cnt = 0
+	for chr in autosomes:
+		cnt += 1
+		O.write(">chrom" + str(cnt) + "_1" + "\n")
+		O.write(chr + "\n")
+		O.write(">chrom" + str(cnt) + "_2" + "\n")
+		O.write(chr + "\n")
+	O.write(">chrom_Y" + "\n")
+	O.write(Ychrom + "\n")
+	O.write(">chrom_X" + "\n")
+	O.write(Xchrom + "\n")
+
+```
+
+now simulate some WGS read data!
+
+use wgsim from samtools package
+
+```
+for i in {1..3}; do
+wgsim -N 160000 -1 150 -2 150 fakegenome.MALE.diploid.fa sample_M_${i}.1.fastq sample_M_${i}.2.fastq
+done
+
+
+for i in {1..3}; do
+wgsim -N 160000 -1 150 -2 150 fakegenome.FEMALE.diploid.fa sample_F_${i}.1.fastq sample_F_${i}.2.fastq
+done
+
+gzip *.fastq
+```
