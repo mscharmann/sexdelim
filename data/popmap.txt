@@ -1,0 +1,7 @@
+sample_F_1	2
+sample_F_2	2
+sample_F_3	2
+sample_M_1	1
+sample_M_2	1
+sample_M_3	1
+

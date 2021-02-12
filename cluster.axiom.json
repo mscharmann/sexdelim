@@ -1,0 +1,37 @@
+{
+    "__default__" :
+    {
+        "time" : "04:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
+    },
+    "bwa_map" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 12,
+        "RAM_memory" : "20G",
+        "partition" : "axiom"
+    },
+    "freebayes" :
+    {
+        "time" : "02:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "20G",
+        "partition" : "axiom"
+    },
+    "merge_vcfs" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "20G",
+        "partition" : "axiom"
+    },
+    "kmerGO" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 12,
+        "RAM_memory" : "60G",
+        "partition" : "axiom"
+    }
+}
