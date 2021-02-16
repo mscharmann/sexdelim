@@ -201,3 +201,4 @@ done
 
 gzip *.fastq
 ```
+
