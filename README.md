@@ -60,6 +60,8 @@ snakemake -j24 --keep-going --rerun-incomplete
 ### on SLURM cluster:
 snakemake -j 500 --cluster-config cluster.axiom.json --cluster "sbatch -p {cluster.partition} -t {cluster.time} -c {cluster.CPUs} --mem={cluster.RAM_memory}" --restart-times 3 --keep-going --rerun-incomplete
 
+### on LSF cluster:
+snakemake -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster.time} -n {cluster.CPUs} -R {cluster.mem_and_span}" --restart-times 3 --keep-going --rerun-incomplete
 
 # Simulate test data: an XY system with the sexchroms and one autosome
 

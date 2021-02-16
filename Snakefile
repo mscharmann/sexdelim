@@ -217,11 +217,14 @@ rule merge_vcfs:
 		region_vcfs=merge_vcfs_input # refers to the function above which evaluates the checkpoint
 	output:
 		"calls/all.pre_filter.vcf.gz"
+	threads: 3
 	shell:
 		"""
 		# MUST NOT USE bcftools concat: it cannot resolve POS that are non-monotonically icreasing (which ca happen at the interval boundaries)
 		# the code below is only slightly modified from freebayes-parallel script: https://github.com/freebayes/freebayes/blob/master/scripts/freebayes-parallel
-		zcat {input.region_vcfs} | python2.7 $(which vcffirstheader) | vcfstreamsort -w 100 | vcfuniq | bgzip -c > {output}
+		# zcat {input.region_vcfs} | python2.7 $(which vcffirstheader) | vcfstreamsort -w 100 | vcfuniq | bgzip -c > {output}
+		# zcat alone may complain about too many arguments, so better use find -exec :
+		find FB_chunk_VCFs/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 100 | vcfuniq | bgzip -c > {output}
 		"""
 
 
@@ -353,6 +356,11 @@ rule pixy_stats:
 		
 		# first, an ugly workaround to avoid an issue caused by vcfallelicprimitives duplicating an INFO field..
 		bcftools view {input.gzvcf} | grep -v "##INFO=<ID=NUMALT" | bgzip -c > vcf_noheader.vcf.gz
+
+		DIR="tmp_zarr"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
 		
 		mkdir tmp_zarr
 		pixy --stats pi fst dxy \
@@ -549,6 +557,11 @@ rule score_XY_gametolog_divergence:
 		"""
 		echo -e "XY_Y_like\\tXY_Y_like" > xypopm
 		echo -e "XY_X_like\\tXY_X_like" >> xypopm
+
+		DIR="tmp_zarr_xy"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
 		
 		mkdir tmp_zarr_xy
 		pixy --stats dxy \
@@ -572,6 +585,11 @@ rule score_ZW_gametolog_divergence:
 		"""
 		echo -e "ZW_W_like\\tZW_W_like" > zwpopm
 		echo -e "ZW_Z_like\\tZW_Z_like" >> zwpopm
+
+		DIR="tmp_zarr_zw"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
 		
 		mkdir tmp_zarr_zw
 		pixy --stats dxy \
