@@ -13,7 +13,9 @@ conda create --name delimit_sexregions
 conda activate delimit_sexregions
 
 conda install snakemake=5.4 bwa samtools bedtools seqtk vcftools bcftools pixy tabix plink parallel freebayes -y
+
 conda install -c conda-forge -c bioconda -c defaults vcflib -y
+
 conda install -c conda-forge r-ggplot2 r-cowplot -y
 
 ### fix small bug in pixy:
