@@ -37,23 +37,14 @@ os.environ["NUMEXPR_MAX_THREADS"]="272"
 wget -P scripts https://github.com/ChnMasterOG/KmerGO/releases/download/v1.5.0/KmerGO_for_linux_x64_cmd.zip
 
 cd scripts
-
 unzip KmerGO_for_linux_x64_cmd.zip
-
 rm KmerGO_for_linux_x64_cmd.zip
-
 cd KmerGO_for_linux_x64_cmd
-
 chmod +x KmerGO
-
 chmod +x bin/kmc
-
 chmod +x bin/kmc_tools
-
 chmod +x bin/kmc_dump
-
 chmod +x bin/cap3
-
 cd ../../
 ```
 ### get accessory script:
