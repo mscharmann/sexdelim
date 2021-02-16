@@ -8,6 +8,8 @@ git clone https://github.com/mscharmann/sexdelim
 
 ### setup a conda environment
 
+## create stepwise
+
 conda create --name delimit_sexregions
 
 conda activate delimit_sexregions
@@ -17,6 +19,12 @@ conda install snakemake=5.4 bwa samtools bedtools seqtk vcftools bcftools pixy t
 conda install -c conda-forge -c bioconda -c defaults vcflib -y
 
 conda install -c conda-forge r-ggplot2 r-cowplot -y
+
+## OR use this YAML:
+
+### modify prefix of installation path in last line of this file, then
+
+conda env create --file delimit_sexregions.2021-02-16.yml
 
 ### fix small bug in pixy:
 nano $(which pixy)
