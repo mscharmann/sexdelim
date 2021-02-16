@@ -1,7 +1,8 @@
 popmapfile = "data/popmap.txt"
-windowsize = 5000
+windowsize = 500
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
+
 
 def read_popmap(popmapfile):
 	
@@ -56,19 +57,34 @@ print (samples_files_dict)
 rule all:
 	input:
 		"calls/all.post_filter.vcf.gz",
-		"calls/windows.multicov.txt",
-		"calls/pixy_output_dxy.txt",
-		"calls/pixy_output_fst.txt",
-		"calls/pixy_output_pi.txt",
+		"calls/windows.multicov.F.txt",
+		"calls/windows.multicov.M.txt",
+		"calls/M_F_norm_coverage_ratio_log2.bed.txt",
 		"calls/plink.assoc_results.significant.window.bed.txt",
 		"calls/plink.assoc_results.assoc.raw.txt",
 		"calls/LD_r2_averaged_per_window.bed.txt",
 		"calls/F_specific_kmer.fa",
 		"calls/M_specific_kmer.fa",
-		"calls/sex_specific_kmers_per_window.bed.txt",
-		"calls/gametolog_candidate_alleles.ZW_divergence.windows.txt",
-		"calls/gametolog_candidate_alleles.XY_divergence.windows.txt"
-
+		"calls/kmers.F_specific.per_window.bed.txt",
+		"calls/kmers.M_specific.per_window.bed.txt",
+		"calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
+		"calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
+		"calls/MvF.dxy.bed.txt",
+		"calls/MvF.fst.bed.txt",
+		"calls/F.pi.bed.txt",
+		"calls/M.pi.bed.txt",
+		"calls/allstats.txt",
+		"calls/allstats.plots.pdf"
+	shell:
+		"""
+		DIR="FB_chunks"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
+		if [ -f "FB_regionsALL.bed" ]; then
+		  rm FB_regionsALL.bed
+		fi
+		"""
 
 
 rule bwa_idx:
@@ -151,7 +167,7 @@ checkpoint split_ref_for_freebayes:
 		
 		echo {input.samples} | sed 's/ /\\n/g' > bamlistforsplit
 		# wget https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc36616869930ec/raw/eff3032ca7c955ca33bffd8758092e4006949c75/split_ref_by_bai_datasize.py
-		python split_ref_by_bai_datasize.py -r {input.ref}.fai -L bamlistforsplit --target-data-size {params.chunksize_Mb} > FB_regionsALL.bed
+		python scripts/split_ref_by_bai_datasize.py -r {input.ref}.fai -L bamlistforsplit --target-data-size {params.chunksize_Mb} > FB_regionsALL.bed
 		rm bamlistforsplit
 		split --lines=1 FB_regionsALL.bed FB_regions_ --numeric-suffixes --suffix-length=4 --additional-suffix=.bed
 		mkdir {output}
@@ -250,7 +266,7 @@ rule VCF_filter_variants:
 		mdps="calls/meandepthpersite.txt",
 		gzvcf="calls/all.pre_filter.vcf.gz"
 	output:
-		temp( "calls/variant_sites.vcf.gz" )
+		"calls/variant_sites.vcf.gz"
 	params:
 		MISS=0.1,
 		QUAL=20,
@@ -283,7 +299,7 @@ rule VCF_filter_invariants:
 		mdps="calls/meandepthpersite.txt",
 		gzvcf="calls/all.pre_filter.vcf.gz"
 	output:
-		temp( "calls/invariant_sites.vcf.gz" )
+		"calls/invariant_sites.vcf.gz"
 	params:
 		MISS=0.1,
 		QUAL=20,
@@ -326,17 +342,42 @@ rule VCF_merge_post_filter:
 rule get_coverage_in_windows:
 	input:
 		fa=genomefile,
+		popmap={popmapfile},
 		bam=expand("mapped_reads/{sample}.sorted.bam", sample=SAMPLES),
 		bai=expand("mapped_reads/{sample}.sorted.bam.bai", sample=SAMPLES)
 	output:
-		"calls/windows.multicov.txt"
+		fcov="calls/windows.multicov.F.txt",
+		mcov="calls/windows.multicov.M.txt",
+		log2ratio="calls/M_F_norm_coverage_ratio_log2.bed.txt"
+	threads: 2
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\t"$2}}' > genomefile.txt
 		bedtools makewindows -w {windowsize} -g genomefile.txt > windows.bed
-		rm genomefile.txt 
-		bedtools multicov -bams {input.bam} -bed windows.bed > {output}
+		rm genomefile.txt
+		
+		# separate calls for M and F	
+		cat {input.popmap} | awk 'NF {{if($2==1) print $1}}' | tr "\\n" "\\t" | awk 'BEGIN {{ OFS="\\t"}}; {{$1=$1; print "chr","start","stop",$0}}' > {output.mcov}
+		cat {input.popmap} | awk 'NF {{if($2==2) print $1}}' | tr "\\n" "\\t" | awk 'BEGIN {{ OFS="\\t"}}; {{$1=$1; print "chr","start","stop",$0}}' > {output.fcov}
+		( bedtools multicov -bams $( cat {input.popmap} | awk 'BEGIN {{ ORS=" "}}; NF {{if($2==1) print "mapped_reads/"$1".sorted.bam"}}' ) -bed windows.bed >> {output.mcov} )&
+		( bedtools multicov -bams $( cat {input.popmap} | awk 'BEGIN {{ ORS=" "}}; NF {{if($2==2) print "mapped_reads/"$1".sorted.bam"}}' ) -bed windows.bed >> {output.fcov} )&
+		wait
 		rm windows.bed
+		
+		################ get M-F norm read coverage ratio log2 (we add 1e-6 to the read counts to avoid zero division)
+		awk '{{ for(i=4; i<=NF;i++) j+=$i; print j; j=0 }}' {output.mcov} > total.M
+		totm=$( awk '{{sum+=$1;}} END{{print sum;}}' total.M )
+		awk -v totalsum="$totm" '{{print ($1*1000000)/totalsum}}' total.M > total.norm.M
+
+		awk '{{ for(i=4; i<=NF;i++) j+=$i; print j; j=0 }}' {output.fcov} > total.F
+		totf=$( awk '{{sum+=$1;}} END{{print sum;}}' total.F )
+		awk -v totalsum="$totf" '{{print ($1*1000000)/totalsum}}' total.F > total.norm.F
+
+		paste total.norm.M total.norm.F | awk '{{print log((($1+1e-6)/($2+1e-6)))/log(2)}}' > log2_ratio
+
+		paste <(cut -f1,2,3 {output.fcov} ) log2_ratio | tail -n +2 > {output.log2ratio}
+
+		rm total.M total.F total.norm.M total.norm.F log2_ratio 	
 		"""
 
 rule pixy_stats:
@@ -344,9 +385,13 @@ rule pixy_stats:
 		popmap={popmapfile},
 		gzvcf="calls/all.post_filter.vcf.gz"
 	output:
-		dxy="calls/pixy_output_dxy.txt",
-		fst="calls/pixy_output_fst.txt",
-		pi="calls/pixy_output_pi.txt"
+		dxy="calls/MvF.dxy.full_report.txt",
+		dxy_bed="calls/MvF.dxy.bed.txt",
+		fst="calls/MvF.fst.full_report.txt",
+		fst_bed="calls/MvF.fst.bed.txt",
+		pi="calls/M_F.pi.full_report.txt",
+		pi_f_bed="calls/F.pi.bed.txt",
+		pi_m_bed="calls/M.pi.bed.txt"		
 	shell:
 		"""
 		# this sometimes throws an error:
@@ -375,6 +420,12 @@ rule pixy_stats:
 		mv pixy_output_dxy.txt {output.dxy}
 		mv pixy_output_fst.txt {output.fst}
 		mv pixy_output_pi.txt {output.pi}
+		
+		cat {output.dxy} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.dxy_bed}
+		cat {output.fst} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.fst_bed}
+	
+		cat {output.pi} | awk 'OFS="\t" {{if($1 == 1) print $2,$3,$4,$5}}' | tail -n +2 > {output.pi_m_bed}
+		cat {output.pi} | awk 'OFS="\t" {{if($1 == 2) print $2,$3,$4,$5}}' | tail -n +2 > {output.pi_f_bed}
 		
 		"""
 
@@ -478,7 +529,7 @@ rule kmerGO:
 		
 		# 16-mers
 		# -ci 	/ 	No minimal K-mer occurring times (default: 2)
-		KmerGO_for_linux_x64_cmd/KmerGO -n {threads} -k 16 -ci 3 -i read_files -t traits_sex_for_kmerGO.txt -p 0.01 -assl 0.8 -assn 0.8
+		scripts/KmerGO_for_linux_x64_cmd/KmerGO -n {threads} -k 16 -ci 3 -i read_files -t traits_sex_for_kmerGO.txt -p 0.01 -assl 0.8 -assn 0.8
 		rm -r kmer_features kmer_matrix read_files kmer_countings traits_sex_for_kmerGO.txt
 		mv contig_result/F_specific_kmer.fa {output.fkmer}
 		mv contig_result/M_specific_kmer.fa {output.mkmer}
@@ -496,7 +547,8 @@ rule match_kmers_to_genome:
 		fkmers="calls/F_specific_kmer.fa",
 		mkmers="calls/M_specific_kmer.fa"
 	output:
-		"calls/sex_specific_kmers_per_window.bed.txt"
+		fsp="calls/kmers.F_specific.per_window.bed.txt",
+		msp="calls/kmers.M_specific.per_window.bed.txt"
 	shell:
 		"""
 		# searching for perfect matches of 21-mers: https://bioinformatics.stackexchange.com/questions/7298/mapping-heteryzygous-kmers-on-a-genome
@@ -518,7 +570,8 @@ rule match_kmers_to_genome:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.kmer.txt
 		bedtools makewindows -w {windowsize} -g genomefile.kmer.txt > windows.kmer.bed
 		rm genomefile.kmer.txt
-		bedtools multicov -bams M_specific_kmer.sorted.bam F_specific_kmer.sorted.bam -bed windows.kmer.bed > {output}
+		bedtools multicov -bams F_specific_kmer.sorted.bam -bed windows.kmer.bed > {output.fsp}
+		bedtools multicov -bams M_specific_kmer.sorted.bam -bed windows.kmer.bed > {output.msp}
 		rm windows.kmer.bed M_specific_kmer.sorted.bam M_specific_kmer.sorted.bam.bai F_specific_kmer.sorted.bam F_specific_kmer.sorted.bam.bai
 		"""
 	
@@ -545,14 +598,15 @@ rule pseudo_phase_gametologs:
 		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
 	shell:
 		"""
-		python pseudo_phase_gametologs.py {input.mfreq} {input.ffreq} {input.gzvcf} | bgzip -c > {output}
+		python scripts/pseudo_phase_gametologs.py {input.mfreq} {input.ffreq} {input.gzvcf} | bgzip -c > {output}
 		"""
 	
 rule score_XY_gametolog_divergence:
 	input:
 		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.XY_divergence.windows.txt"
+		full="calls/gametolog_candidate_alleles.XY_divergence.windows.full_report.txt",
+		bedformat="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
 	shell:
 		"""
 		echo -e "XY_Y_like\\tXY_Y_like" > xypopm
@@ -573,14 +627,16 @@ rule score_XY_gametolog_divergence:
 		--outfile_prefix ./XY
 		rm -r tmp_zarr_xy xypopm
 
-		mv XY_dxy.txt {output}		
+		mv XY_dxy.txt {output.full}
+		cat {output.full} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.bedformat}	
 		"""
 
 rule score_ZW_gametolog_divergence:
 	input:
 		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.ZW_divergence.windows.txt"
+		full="calls/gametolog_candidate_alleles.ZW_divergence.windows.full_report.txt",
+		bedformat="calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
 	shell:
 		"""
 		echo -e "ZW_W_like\\tZW_W_like" > zwpopm
@@ -601,6 +657,37 @@ rule score_ZW_gametolog_divergence:
 		--outfile_prefix ./ZW
 		rm -r tmp_zarr_zw zwpopm
 
-		mv ZW_dxy.txt {output}		
+		mv ZW_dxy.txt {output.full}
+		cat {output.full} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.bedformat}	
 		"""
+
+rule plot_all:
+	input:
+		a="calls/M_F_norm_coverage_ratio_log2.bed.txt",
+		b="calls/kmers.F_specific.per_window.bed.txt",
+		c="calls/kmers.M_specific.per_window.bed.txt",
+		d="calls/F.pi.bed.txt",
+		e="calls/M.pi.bed.txt",
+		f="calls/MvF.fst.bed.txt",
+		g="calls/MvF.dxy.bed.txt",
+		h="calls/LD_r2_averaged_per_window.bed.txt",
+		i="calls/plink.assoc_results.significant.window.bed.txt",
+		j="calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
+		k="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
+	output:
+		stats="calls/allstats.txt",
+		plot="calls/allstats.plots.pdf"
+	shell:
+		"""
+		cat {input.a} > {output.stats}
+
+		for i in {input.b} {input.c} {input.d} {input.e} {input.f} {input.g} {input.h} {input.i} {input.j} {input.k} ; do
+			paste {output.stats} <(cut -f4 $i ) > tmpst
+			mv tmpst {output.stats}
+		done
+		
+		Rscript scripts/plot_allstats.R {output.stats} {output.plot}	
+		"""
+
+
 	

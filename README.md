@@ -13,8 +13,8 @@ conda create --name delimit_sexregions
 conda activate delimit_sexregions
 
 conda install snakemake=5.4 bwa samtools bedtools seqtk vcftools bcftools pixy tabix plink parallel freebayes -y
-
-conda install -c conda-forge -c bioconda -c defaults vcflib
+conda install -c conda-forge -c bioconda -c defaults vcflib -y
+conda install -c conda-forge r-ggplot2 r-cowplot -y
 
 ### fix small bug in pixy:
 nano $(which pixy)
@@ -28,9 +28,13 @@ os.environ["NUMEXPR_MAX_THREADS"]="272"
 
 ### get kmerGO
 
-wget https://github.com/ChnMasterOG/KmerGO/releases/download/v1.5.0/KmerGO_for_linux_x64_cmd.zip
+wget -P scripts https://github.com/ChnMasterOG/KmerGO/releases/download/v1.5.0/KmerGO_for_linux_x64_cmd.zip
+
+cd scripts
 
 unzip KmerGO_for_linux_x64_cmd.zip
+
+rm KmerGO_for_linux_x64_cmd.zip
 
 cd KmerGO_for_linux_x64_cmd
 
@@ -44,8 +48,10 @@ chmod +x bin/kmc_dump
 
 chmod +x bin/cap3
 
+cd ../../
+
 ### get accessory script:
-wget https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc36616869930ec/raw/eff3032ca7c955ca33bffd8758092e4006949c75/split_ref_by_bai_datasize.py
+wget -P scripts https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc36616869930ec/raw/eff3032ca7c955ca33bffd8758092e4006949c75/split_ref_by_bai_datasize.py
 
 
 
