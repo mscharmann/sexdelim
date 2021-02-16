@@ -3,29 +3,25 @@
 ## installation
 
 ### clone this repo
-
+```
 git clone https://github.com/mscharmann/sexdelim
-
+```
 ### setup a conda environment
 
 ## create stepwise
-
+```
 conda create --name delimit_sexregions
-
 conda activate delimit_sexregions
-
 conda install snakemake=5.4 bwa samtools bedtools seqtk vcftools bcftools pixy tabix plink parallel freebayes -y
-
 conda install -c conda-forge -c bioconda -c defaults vcflib -y
-
 conda install -c conda-forge r-ggplot2 r-cowplot -y
-
+```
 ## OR use this YAML:
 
 ### modify prefix of installation path in last line of this file, then
-
+```
 conda env create --file delimit_sexregions.2021-02-16.yml
-
+```
 ### fix small bug in pixy:
 nano $(which pixy)
 
@@ -37,7 +33,7 @@ os.environ["NUMEXPR_MAX_THREADS"]="272"
 
 
 ### get kmerGO
-
+```
 wget -P scripts https://github.com/ChnMasterOG/KmerGO/releases/download/v1.5.0/KmerGO_for_linux_x64_cmd.zip
 
 cd scripts
@@ -59,10 +55,11 @@ chmod +x bin/kmc_dump
 chmod +x bin/cap3
 
 cd ../../
-
+```
 ### get accessory script:
+```
 wget -P scripts https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc36616869930ec/raw/eff3032ca7c955ca33bffd8758092e4006949c75/split_ref_by_bai_datasize.py
-
+```
 
 
 ## run
@@ -71,14 +68,17 @@ wget -P scripts https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc3661
 - adjust the input popmap + the map of samples to fq files + the reference genome file
 
 ### local:
+```
 snakemake -j24 --keep-going --rerun-incomplete
-
+```
 ### on SLURM cluster:
+```
 snakemake -j 500 --cluster-config cluster.axiom.json --cluster "sbatch -p {cluster.partition} -t {cluster.time} -c {cluster.CPUs} --mem={cluster.RAM_memory}" --restart-times 3 --keep-going --rerun-incomplete
-
+```
 ### on LSF cluster:
+```
 snakemake -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster.time} -n {cluster.CPUs} -R {cluster.mem_and_span}" --restart-times 3 --keep-going --rerun-incomplete
-
+```
 # Simulate test data: an XY system with the sexchroms and one autosome
 
 ```
