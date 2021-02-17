@@ -162,7 +162,7 @@ checkpoint split_ref_for_freebayes:
 		indexes=expand("mapped_reads/{sample}.sorted.bam.bai", sample=SAMPLES),
 		samples=expand("mapped_reads/{sample}.sorted.bam", sample=SAMPLES)
 	output:
-		temp( directory("FB_chunks") )
+		directory("FB_chunks")
 	params:
 		chunksize_Mb = 100000
 	shell:
