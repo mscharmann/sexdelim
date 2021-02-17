@@ -94,7 +94,11 @@ rule bwa_idx:
 		"{genomefile}.bwt"
 	shell:
 		"""
-		bwa index {input}
+		if [[ ! $( grep ">" {input} ) =~ "|" ]]; then
+			bwa index {input}
+		else
+			echo "refusing to run, fasta headers contain pipe '|' character, dying"
+		fi
 		"""
 
 rule bwa_map:
