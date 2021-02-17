@@ -242,9 +242,9 @@ rule merge_vcfs:
 		"""
 		# MUST NOT USE bcftools concat: it cannot resolve POS that are non-monotonically icreasing (which ca happen at the interval boundaries)
 		# the code below is only slightly modified from freebayes-parallel script: https://github.com/freebayes/freebayes/blob/master/scripts/freebayes-parallel
-		# zcat {input.region_vcfs} | python2.7 $(which vcffirstheader) | vcfstreamsort -w 100 | vcfuniq | bgzip -c > {output}
+		# zcat {input.region_vcfs} | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		# zcat alone may complain about too many arguments, so better use find -exec :
-		find FB_chunk_VCFs/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 100 | vcfuniq | bgzip -c > {output}
+		find FB_chunk_VCFs/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		"""
 
 
