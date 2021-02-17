@@ -17,7 +17,7 @@
     {
         "time" : "02:00:00",
         "CPUs" : 1,
-        "RAM_memory" : "20G",
+        "RAM_memory" : "2G",
         "partition" : "axiom"
     },
     "merge_vcfs" :
@@ -33,5 +33,13 @@
         "CPUs" : 12,
         "RAM_memory" : "60G",
         "partition" : "axiom"
+    },
+	"pixy_stats" :
+    {
+        "time" : "12:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
     }
 }
+
