@@ -3,7 +3,7 @@
     {
         "time" : "4:00",
         "CPUs" : 1,
-        "mem_and_span" : "\"rusage[mem=10000] span[hosts=1]\""
+        "mem_and_span" : "\"rusage[mem=2000] span[hosts=1]\""
     },
     "bwa_map" :
     {
@@ -15,7 +15,7 @@
     {
         "time" : "2:00",
         "CPUs" : 1,
-        "mem_and_span" : "\"rusage[mem=20000] span[hosts=1]\"" 
+        "mem_and_span" : "\"rusage[mem=1000] span[hosts=1]\"" 
     },
     "merge_vcfs" :
     {
@@ -28,5 +28,12 @@
         "time" : "12:00",
         "CPUs" : 12,
         "mem_and_span" : "\"rusage[mem=5000] span[hosts=1]\""
+    },
+    "pixy_stats" :
+    {
+        "time" : "12:00",
+        "CPUs" : 1,
+        "mem_and_span" : "\"rusage[mem=2000] span[hosts=1]\""
     }
 }
+
