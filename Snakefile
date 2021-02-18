@@ -2,6 +2,8 @@ popmapfile = "data/popmap.txt"
 windowsize = 500
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
+regions_for_plot_bed = "data/regions_for_plot.bed"
+
 
 
 def read_popmap(popmapfile):
@@ -74,7 +76,8 @@ rule all:
 		"calls/F.pi.bed.txt",
 		"calls/M.pi.bed.txt",
 		"calls/allstats.txt",
-		"calls/allstats.plots.pdf"
+		"calls/allstats.plots.pdf",
+		"calls/region.stats.plots.pdf"
 	shell:
 		"""
 		DIR="FB_chunks"
@@ -688,6 +691,7 @@ rule score_ZW_gametolog_divergence:
 
 rule plot_all:
 	input:
+		regions=regions_for_plot_bed,
 		a="calls/M_F_norm_coverage_ratio_log2.bed.txt",
 		b="calls/kmers.F_specific.per_window.bed.txt",
 		c="calls/kmers.M_specific.per_window.bed.txt",
@@ -701,7 +705,9 @@ rule plot_all:
 		k="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
 	output:
 		stats="calls/allstats.txt",
-		plot="calls/allstats.plots.pdf"
+		regionstats="calls/region.stats.txt",
+		plot="calls/allstats.plots.pdf",
+		regionplot="calls/region.stats.plots.pdf"
 	shell:
 		"""
 		cat {input.a} > {output.stats}
@@ -711,7 +717,10 @@ rule plot_all:
 			mv tmpst {output.stats}
 		done
 		
-		Rscript scripts/plot_allstats.R {output.stats} {output.plot}	
+		bedtools intersect -wa -a {output.stats} -b {input.regions} > {output.regionstats}
+		
+		Rscript scripts/plot_allstats.R {output.stats} {output.plot}
+		Rscript scripts/plot_allstats.R {output.regionstats} {output.regionplot}	
 		"""
 
 
