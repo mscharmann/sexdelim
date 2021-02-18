@@ -253,15 +253,36 @@ rule VCF_get_mean_depth_per_site:
 		"calls/all.pre_filter.vcf.gz"
 	output:
 		"calls/meandepthpersite.txt"
+	threads: 2
 	shell:
 		"""
-		# get a subset of 0.1% of the VCF records, which is used to estimate mean depth per site
-		bcftools view {input} | vcfrandomsample -r 0.001 | bgzip -c > subset.vcf.gz
-
-		# Calculate mean depth per site
-		vcftools --gzvcf subset.vcf.gz --site-mean-depth --stdout | cut -f3 > {output}
+		# index VCF
+		( tabix {input} )&
 		
-		rm subset.vcf.gz
+		# get a subset of 10k to 100k of the raw VCF records; iteratively keeping only 10% of lines in file
+		( zcat {input} | cut -f1,2 > all_pos_in_vcf.txt 
+		
+		cp all_pos_in_vcf.txt tmp1
+		nlines=$( cat tmp1 | wc -l )
+		echo $nlines
+		while [ "$nlines " -gt 100000 ] ; do
+		awk 'NR == 1 || NR % 10 == 0' tmp1 > tmp2
+		mv tmp2 tmp1
+		nlines=$( cat tmp1 | wc -l )
+		echo $nlines
+		done
+		)&
+		wait
+		
+		grep -v "#" tmp1 > postokeep.txt
+	
+		# subset the VCF
+		tabix -h -R postokeep.txt {input} > subset.vcf
+		
+		# Calculate mean depth per site
+		vcftools --vcf subset.vcf --site-mean-depth --stdout | cut -f3 > {output}
+		
+		rm subset.vcf tmp1 all_pos_in_vcf.txt postokeep.txt 
 		"""
 
 	
@@ -280,15 +301,15 @@ rule VCF_filter_variants:
 		## https://bcbio.wordpress.com/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/#comment-1469
 		## => "We use ... a very vanilla filter with only depth and quality (QUAL < 20, DP < 5)"
 		## => impose a minimum of QUAL, and a minimum of DEPTH
-		## 	for variants, I want those two, AND a maximum DPETH cutoff at 95% of the mean depth over all samples
+		## 	for variants, I want those two, AND a maximum DPETH cutoff 
 		## 	for invariants, we can only impose a minimum DEPTH and a maximum DEPTH.
 		## use code from dDocent to calcualte a mean depth histogram, then find the 95th percentile: no. too complicated; there are easier ways to do this.
 		## also good info:
 		## 	https://speciationgenomics.github.io/filtering_vcfs/
 
 		# set filters
-		# MAX_DEPTH is specific to the dataset; we take the 95th percentile of the mean depths per site:
-		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p5=(c/100*5); p5=p5%1?int(p5)+1:p5; print a[c-p5-1]}}' )
+		# MAX_DEPTH is specific to the dataset; we take the 98th percentile of the mean depths per site:
+		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
 
 		echo $MAX_DEPTH
 
@@ -313,15 +334,15 @@ rule VCF_filter_invariants:
 		## https://bcbio.wordpress.com/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/#comment-1469
 		## => "We use ... a very vanilla filter with only depth and quality (QUAL < 20, DP < 5)"
 		## => impose a minimum of QUAL, and a minimum of DEPTH
-		## 	for variants, I want those two, AND a maximum DPETH cutoff at 95% of the mean depth over all samples
+		## 	for variants, I want those two, AND a maximum DPETH cutoff 
 		## 	for invariants, we can only impose a minimum DEPTH and a maximum DEPTH.
 		## use code from dDocent to calcualte a mean depth histogram, then find the 95th percentile: no. too complicated; there are easier ways to do this.
 		## also good info:
 		## 	https://speciationgenomics.github.io/filtering_vcfs/
 
 		# set filters
-		# MAX_DEPTH is specific to the dataset; we take the 95th percentile of the mean depths per site:
-		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p5=(c/100*5); p5=p5%1?int(p5)+1:p5; print a[c-p5-1]}}' )
+		# MAX_DEPTH is specific to the dataset; we take the 98th percentile of the mean depths per site:
+		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
 
 		echo $MAX_DEPTH
 
