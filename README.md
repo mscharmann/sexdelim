@@ -2,7 +2,7 @@
 
 a pipeline to delimit sex-linked regions in chromosome-scale genome assemblies, using re-sequencing data of males and females
 
-starting from a genome .fasta and fastq reads, ouputs 11 statistics in windows along the genome:
+starting from a genome .fasta and fastq reads, generates 11 statistics in windows along the genome:
 
 - count of alignments for male-specific kmers (16-mers), aligned with 1 mismatch
 
