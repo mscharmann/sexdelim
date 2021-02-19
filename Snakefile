@@ -462,7 +462,7 @@ rule GWAS_plink:
 		cpus=4
 	shell:
 		"""
-		# PLINK has a few probematic behaviours: 
+		# PLINK has a few problematic behaviours: 
 		# - VCF gets converted to temporary plink format files with hard-coded names.. => RACE CONDITON when multiple instances of plink run
 		# - it will by default use ALL-1 CPUs => must use argument --threads
 		# - By default, PLINK 1.9 tries to reserve half of your system's RAM for its main workspace. => --memory <main workspace size, in MB>
@@ -501,7 +501,7 @@ rule LD_plink:
 		cpus=4
 	shell:
 		"""
-		# PLINK has a few probematic behaviours: 
+		# PLINK has a few problematic behaviours: 
 		# - VCF gets converted to temporary plink format files with hard-coded names.. => RACE CONDITON when multiple instances of plink run
 		# - it will by default use ALL-1 CPUs => must use argument --threads
 		# - By default, PLINK 1.9 tries to reserve half of your system's RAM for its main workspace. => --memory <main workspace size, in MB>
@@ -526,9 +526,15 @@ rule LD_plink:
 
 		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > ld_clean.sorted.bed > ld_clean.sorted.bed
 
+		# create windows, sort chroms lexicographically (same as the LD output)
 		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
-		bedtools makewindows -w {windowsize} -g genomefile.ld.txt > windows.ld.bed
-		bedtools map -a windows.ld.bed -b ld_clean.sorted.bed -c 4 -o mean > ../{output}
+		bedtools makewindows -w {windowsize} -g genomefile.ld.txt | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > windows.ld.bed
+
+		# get the mean LD per window
+		bedtools map -a windows.ld.bed -b ld_clean.sorted.bed -c 4 -o mean > tmpoutperwindow.txt
+
+		# sort chroms back to the same order as the genome file:
+		bedtools sort -g genomefile.ld.txt -i tmpoutperwindow.txt > ../{output}
 
 		cd ../
 		rm -r tmpdir_plink_LD
