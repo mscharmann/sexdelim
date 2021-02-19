@@ -36,10 +36,30 @@
     },
 	"pixy_stats" :
     {
-        "time" : "12:00",
+        "time" : "12:00:00",
         "CPUs" : 1,
         "RAM_memory" : "10G",
         "partition" : "axiom"
+    },
+	"VCF_get_mean_depth_per_site" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "5G",
+        "partition" : "axiom"
+    },
+	"LD_plink" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 4,
+        "RAM_memory" : "20G",
+        "partition" : "axiom"
+    },
+	"GWAS_plink" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 4,
+        "RAM_memory" : "20G",
+        "partition" : "axiom"
     }
 }
-

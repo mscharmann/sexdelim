@@ -78,16 +78,7 @@ rule all:
 		"calls/allstats.txt",
 		"calls/allstats.plots.pdf",
 		"calls/region.stats.plots.pdf"
-	shell:
-		"""
-		DIR="FB_chunks"
-		if [ -d "$DIR" ]; then
-		  rm -r $DIR
-		fi
-		if [ -f "FB_regionsALL.bed" ]; then
-		  rm FB_regionsALL.bed
-		fi
-		"""
+
 
 
 rule bwa_idx:
@@ -466,24 +457,37 @@ rule GWAS_plink:
 	output:
 		plinkassoc="calls/plink.assoc_results.significant.window.bed.txt",
 		rawplink="calls/plink.assoc_results.assoc.raw.txt"
+	resources:
+		mem_mb=20000,
+		cpus=4
 	shell:
 		"""
-		cat {input.popmap} | awk 'NF {{print $1"\\t"$1"\\t"$2}}' > thepheno
-		plink --vcf {input.gzvcf} --double-id --allow-extra-chr --pheno thepheno --allow-no-sex --assoc --out assoc_results	
-		rm thepheno
+		# PLINK has a few probematic behaviours: 
+		# - VCF gets converted to temporary plink format files with hard-coded names.. => RACE CONDITON when multiple instances of plink run
+		# - it will by default use ALL-1 CPUs => must use argument --threads
+		# - By default, PLINK 1.9 tries to reserve half of your system's RAM for its main workspace. => --memory <main workspace size, in MB>
+		
+		DIR="tmpdir_plink_GWAS"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
+		mkdir tmpdir_plink_GWAS
+		cd tmpdir_plink_GWAS
+
+		cat ../{input.popmap} | awk 'NF {{print $1"\\t"$1"\\t"$2}}' > thepheno
+		plink --vcf ../{input.gzvcf} --double-id --allow-extra-chr --pheno thepheno --allow-no-sex --assoc --out assoc_results	--threads {resources.cpus} --memory {resources.mem_mb} 
 		
 		cat assoc_results.assoc | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
-		mv assoc_results.assoc {output.rawplink}
-		rm assoc_results*
+		mv assoc_results.assoc ../{output.rawplink}
 
 		cat plink.assoc_results.significant.txt | cut -f1,3,9 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
-		rm plink.assoc_results.significant.txt
 
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
+		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
 		bedtools makewindows -w {windowsize} -g genomefile.assoc.txt > windows.assoc.bed
-		rm genomefile.assoc.txt 
-		bedtools coverage -counts -a windows.assoc.bed -b plink.assoc_results.significant.bed > {output.plinkassoc}
-		rm windows.assoc.bed plink.assoc_results.significant.bed
+		bedtools coverage -counts -a windows.assoc.bed -b plink.assoc_results.significant.bed > ../{output.plinkassoc}
+
+		cd ../
+		rm -r tmpdir_plink_GWAS	
 		"""
 
 rule LD_plink:
@@ -492,30 +496,44 @@ rule LD_plink:
 		fa=genomefile
 	output:
 		"calls/LD_r2_averaged_per_window.bed.txt"
+	resources:
+		mem_mb=20000,
+		cpus=4
 	shell:
 		"""
+		# PLINK has a few probematic behaviours: 
+		# - VCF gets converted to temporary plink format files with hard-coded names.. => RACE CONDITON when multiple instances of plink run
+		# - it will by default use ALL-1 CPUs => must use argument --threads
+		# - By default, PLINK 1.9 tries to reserve half of your system's RAM for its main workspace. => --memory <main workspace size, in MB>
+		
+		DIR="tmpdir_plink_LD"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
+		mkdir tmpdir_plink_LD
+		cd tmpdir_plink_LD
+
 		# apply a moderate MAF filter before calculating LD as rare alleles imply very high LD by definition; they are thus useless for our purpose.
 		# vcftools --gzvcf {input.gzvcf} --maf 0.1 --recode --stdout > forplinkld.vcf
 		# plink --vcf forplinkld.vcf --double-id --allow-extra-chr --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 
 		# rm forplinkld.vcf 
 		
-		plink --vcf {input.gzvcf} --double-id --allow-extra-chr --maf 0.1 --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 
+		plink --vcf ../{input.gzvcf} --double-id --allow-extra-chr --maf 0.1 --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 --threads {resources.cpus} --memory {resources.mem_mb} 
 		
 		# --ld-window X	compute LD only for pairs that are at most X SNPs apart (default 10)
 		# --ld-window-kb X	compute LD only for pairs that are at most X kb apart (default 1000 kb)
 		# --ld-window-r2 X	minimum r2 to report, else omit from output. Default = 0.2
 
-		rm plink.log plink.nosex
-
 		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' > ld_clean.bed
 
 		bedtools sort -i ld_clean.bed > ld_clean.sorted.bed
 
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
+		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
 		bedtools makewindows -w {windowsize} -g genomefile.ld.txt > windows.ld.bed
-		rm genomefile.ld.txt 
-		bedtools map -a windows.ld.bed -b ld_clean.sorted.bed -c 4 -o mean > {output}
-		rm ld_clean.sorted.bed windows.ld.bed ld_clean.bed plink.ld
+		bedtools map -a windows.ld.bed -b ld_clean.sorted.bed -c 4 -o mean > ../{output}
+
+		cd ../
+		rm -r tmpdir_plink_LD
 		"""
 	
 	
