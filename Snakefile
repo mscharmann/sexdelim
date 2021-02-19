@@ -524,9 +524,7 @@ rule LD_plink:
 		# --ld-window-kb X	compute LD only for pairs that are at most X kb apart (default 1000 kb)
 		# --ld-window-r2 X	minimum r2 to report, else omit from output. Default = 0.2
 
-		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' > ld_clean.bed
-
-		bedtools sort -i ld_clean.bed > ld_clean.sorted.bed
+		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > ld_clean.sorted.bed > ld_clean.sorted.bed
 
 		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
 		bedtools makewindows -w {windowsize} -g genomefile.ld.txt > windows.ld.bed
