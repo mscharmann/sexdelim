@@ -27,6 +27,13 @@
         "RAM_memory" : "20G",
         "partition" : "axiom"
     },
+    "VCF_filter_invariants" :
+    {
+    	"time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "5G",
+        "partition" : "axiom"
+    },
     "kmerGO" :
     {
         "time" : "12:00:00",
@@ -61,5 +68,27 @@
         "CPUs" : 4,
         "RAM_memory" : "20G",
         "partition" : "axiom"
+    },
+	"pixy_stats" :
+    {
+        "time" : "24:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
+    },
+	"score_XY_gametolog_divergence" :
+    {
+        "time" : "24:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
+    },
+	"score_ZW_gametolog_divergence" :
+    {
+        "time" : "24:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
     }
 }
+

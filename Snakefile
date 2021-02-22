@@ -2,7 +2,7 @@ popmapfile = "data/popmap.txt"
 windowsize = 500
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
-regions_for_plot_bed = "data/regions_for_plot.bed"
+regions_for_plot_bed = "data/Ychrom.bed"
 
 
 
