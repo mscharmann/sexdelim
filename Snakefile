@@ -1,5 +1,5 @@
 popmapfile = "data/popmap.txt"
-windowsize = 500
+windowsize = 2500
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
 regions_for_plot_bed = "data/Ychrom.bed"
@@ -75,6 +75,8 @@ rule all:
 		"calls/MvF.fst.bed.txt",
 		"calls/F.pi.bed.txt",
 		"calls/M.pi.bed.txt",
+		"calls/het_males.bed.txt",
+		"calls/het_females.bed.txt",
 		"calls/allstats.txt",
 		"calls/allstats.plots.pdf",
 		"calls/region.stats.plots.pdf"
@@ -638,6 +640,40 @@ rule calculate_freqs:
 		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --freq --stdout | gzip > {output.mfreq}
 		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --freq --stdout | gzip > {output.ffreq}
 		"""
+
+rule calc_indiv_het:
+	input:
+		popm={popmapfile},
+		gzvcf="calls/variant_sites.vcf.gz"
+	output:
+		mhet="calls/het_males.txt",
+		fhet="calls/het_females.txt"
+	shell:
+		"""
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.mhet}
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.fhet}
+		"""
+
+rule indiv_het_per_windows:
+	input:
+		fa=genomefile,
+		mhet="calls/het_males.txt",
+		fhet="calls/het_females.txt"		
+	output:
+		mhetwindows="calls/het_males.bed.txt",
+		fhetwindows="calls/het_females.bed.txt"
+	shell:
+		"""	
+		# create windows, sort chroms lexicographically (same as the LD output)
+		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.het.txt
+		bedtools makewindows -w {windowsize} -g genomefile.het.txt > windows.het.bed
+
+		# get the mean HET per window
+		bedtools map -a windows.het.bed -b {input.mhet} -c 4 -o mean > {output.mhetwindows}
+		bedtools map -a windows.het.bed -b {input.fhet} -c 4 -o mean > {output.fhetwindows}
+		
+		rm genomefile.het.txt windows.het.bed		
+		"""
 	
 rule pseudo_phase_gametologs:
 	input:
@@ -724,7 +760,9 @@ rule plot_all:
 		h="calls/LD_r2_averaged_per_window.bed.txt",
 		i="calls/plink.assoc_results.significant.window.bed.txt",
 		j="calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
-		k="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
+		k="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
+		l="calls/het_males.bed.txt",
+		m="calls/het_females.bed.txt" 
 	output:
 		stats="calls/allstats.txt",
 		regionstats="calls/region.stats.txt",
@@ -734,7 +772,7 @@ rule plot_all:
 		"""
 		cat {input.a} > {output.stats}
 
-		for i in {input.b} {input.c} {input.d} {input.e} {input.f} {input.g} {input.h} {input.i} {input.j} {input.k} ; do
+		for i in {input.b} {input.c} {input.d} {input.e} {input.f} {input.g} {input.h} {input.i} {input.j} {input.k} {input.l} {input.m} ; do
 			paste {output.stats} <(cut -f4 $i ) > tmpst
 			mv tmpst {output.stats}
 		done
