@@ -401,114 +401,53 @@ rule get_coverage_in_windows:
 		rm total.M total.F total.norm.M total.norm.F log2_ratio 	
 		"""
 
-rule pi_rawstats_M:
+rule pixy_stats:
 	input:
 		popmap={popmapfile},
 		gzvcf="calls/all.post_filter.vcf.gz"
 	output:
-		"calls/pi_raw.M.txt"		
-	shell:
-		"""
-		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
-		rm mpop_pi
-		"""
-
-rule pi_rawstats_F:
-	input:
-		popmap={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
-	output:
-		"calls/pi_raw.F.txt"		
-	shell:
-		"""
-		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
-		rm fpop_pi
-		"""
-
-rule pi_windowed:
-	input:
-		pim="calls/pi_raw.M.txt",
-		pif="calls/pi_raw.F.txt",
-		fa=genomefile
-	output:
+		dxy="calls/MvF.dxy.full_report.txt",
+		dxy_bed="calls/MvF.dxy.bed.txt",
+		fst="calls/MvF.fst.full_report.txt",
+		fst_bed="calls/MvF.fst.bed.txt",
+		pi="calls/M_F.pi.full_report.txt",
 		pi_f_bed="calls/F.pi.bed.txt",
 		pi_m_bed="calls/M.pi.bed.txt"		
 	shell:
 		"""
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.pi.txt
-		bedtools makewindows -w {windowsize} -g genomefile.pi.txt > windows.pi.bed
+		# this sometimes throws an error:
+		# raise ValueError('values must be monotonically increasing')
+		# ValueError: values must be monotonically increasing
 		
-		# NOT yet correct...
-		bedtools map -a windows.pi.bed -b {input.pim} -c 4 -o mean > {output.pi_m_bed}
-		bedtools map -a windows.pi.bed -b {input.pif} -c 4 -o mean > {output.pi_f_bed}
 		
-		rm genomefile.pi.txt windows.pi.bed
-		"""
+		# first, an ugly workaround to avoid an issue caused by vcfallelicprimitives duplicating an INFO field..
+		bcftools view {input.gzvcf} | grep -v "##INFO=<ID=NUMALT" | bgzip -c > vcf_noheader.vcf.gz
 
-rule dxy_rawstats:
-	input:
-		popmap={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
-	output:
-		"calls/dxy_raw.txt"		
-	shell:
-		"""
-		zcat {input.gzvcf} | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} > {output}
-		"""
-
-rule dxy_windowed:
-	input:
-		raw="calls/dxy_raw.txt",
-		fa=genomefile
-	output:
-		"calls/MvF.dxy.bed.txt"
-	shell:
-		"""
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.dxy.txt
-		bedtools makewindows -w {windowsize} -g genomefile.dxy.txt > windows.dxy.bed
+		DIR="tmp_zarr"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
 		
-		# NOT yet correct...
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 4 -o mean > dxy_denom
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 5 -o mean > dxy_nomin
+		mkdir tmp_zarr
+		pixy --stats pi fst dxy \
+		--vcf vcf_noheader.vcf.gz \
+		--zarr_path tmp_zarr \
+		--window_size {windowsize} \
+		--populations {input.popmap} \
+		--bypass_filtration yes
+		rm -r tmp_zarr
+		rm vcf_noheader.vcf.gz
 		
-		paste dxy_denom dxy_nomin > dxy_both
+		mv pixy_output_dxy.txt {output.dxy}
+		mv pixy_output_fst.txt {output.fst}
+		mv pixy_output_pi.txt {output.pi}
 		
-		awk '{{ print $1/$2 }}' dxy_both > {output}
+		cat {output.dxy} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.dxy_bed}
+		cat {output.fst} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.fst_bed}
+	
+		cat {output.pi} | awk 'OFS="\t" {{if($1 == 1) print $2,$3,$4,$5}}' | tail -n +2 > {output.pi_m_bed}
+		cat {output.pi} | awk 'OFS="\t" {{if($1 == 2) print $2,$3,$4,$5}}' | tail -n +2 > {output.pi_f_bed}
 		
-		rm genomefile.dxy.txt windows.dxy.bed dxy_denom dxy_nomin dxy_both
-		"""
-
-rule fst_rawstats:
-	input:
-		popmap={popmapfile},
-		gzvcf="calls/variants.vcf.gz"
-	output:
-		"calls/fst_raw.txt"		
-	shell:
-		"""
-		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_fst
-		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_fst
-
-		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst--weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}'> {output}
-		rm mpop_fst fpop_fst
-		"""
-
-rule fst_windowed:
-	input:
-		fraw="calls/fst_raw.txt",
-		fa=genomefile
-	output:
-		"calls/MvF.fst.bed.txt"
-	shell:
-		"""
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.fst.txt
-		bedtools makewindows -w {windowsize} -g genomefile.fst.txt > windows.fst.bed
-		
-		bedtools map -a windows.fst.bed -b {input.fraw} -c 4 -o mean > {output}
-		
-		rm genomefile.fst.txt windows.fst.bed		
 		"""
 
 	
@@ -752,78 +691,61 @@ rule score_XY_gametolog_divergence:
 	input:
 		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.XY_divergence.rawstats.txt"
+		full="calls/gametolog_candidate_alleles.XY_divergence.windows.full_report.txt",
+		bedformat="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
 	shell:
 		"""
 		echo -e "XY_Y_like\\tXY_Y_like" > xypopm
 		echo -e "XY_X_like\\tXY_X_like" >> xypopm
-		
-		echo -e "XY_X_like" > xypop
-		echo -e "XY_Y_like" >> xypop
 
-		vcftools --gzvcf {input} --keep xypop --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm > {output}
-		rm xypopm xypop
+		DIR="tmp_zarr_xy"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
+		
+		mkdir tmp_zarr_xy
+		pixy --stats dxy \
+		--vcf {input} \
+		--zarr_path tmp_zarr_xy \
+		--window_size {windowsize} \
+		--populations xypopm \
+		--bypass_filtration yes \
+		--outfile_prefix ./XY
+		rm -r tmp_zarr_xy xypopm
+
+		mv XY_dxy.txt {output.full}
+		cat {output.full} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.bedformat}	
 		"""
 
 rule score_ZW_gametolog_divergence:
 	input:
 		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.ZW_divergence.rawstats.txt"
+		full="calls/gametolog_candidate_alleles.ZW_divergence.windows.full_report.txt",
+		bedformat="calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
 	shell:
 		"""
 		echo -e "ZW_W_like\\tZW_W_like" > zwpopm
 		echo -e "ZW_Z_like\\tZW_Z_like" >> zwpopm
-		
-		echo -e "ZW_W_like" > zwpop
-		echo -e "ZW_Z_like" >> zwpop
 
-		vcftools --gzvcf {input} --keep zwpop --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm > {output}
-		rm zwpopm zwpop
+		DIR="tmp_zarr_zw"
+		if [ -d "$DIR" ]; then
+		  rm -r $DIR
+		fi
+		
+		mkdir tmp_zarr_zw
+		pixy --stats dxy \
+		--vcf {input} \
+		--zarr_path tmp_zarr_zw \
+		--window_size {windowsize} \
+		--populations zwpopm \
+		--bypass_filtration yes \
+		--outfile_prefix ./ZW
+		rm -r tmp_zarr_zw zwpopm
+
+		mv ZW_dxy.txt {output.full}
+		cat {output.full} | awk 'OFS="\\t" {{print $3,$4,$5,$6}}' | tail -n +2 > {output.bedformat}	
 		"""
-
-rule XY_div_windows:
-	input:
-		raw="calls/gametolog_candidate_alleles.XY_divergence.rawstats.txt",
-		fa=genomefile
-	output:
-		"calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
-	shell:
-		"""
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
-		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
-
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 4 -o mean > XY_dxy_denom
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 5 -o mean > XY_dxy_nomin
-		
-		paste XY_dxy_denom XY_dxy_nomin > XY_dxy_both
-		
-		awk '{{ print $1/$2 }}' XY_dxy_both > {output}
-		
-		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_nomin XY_dxy_both		
-		"""
-
-rule ZW_div_windows:
-	input:
-		raw="calls/gametolog_candidate_alleles.ZW_divergence.rawstats.txt",
-		fa=genomefile
-	output:
-		"calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
-	shell:
-		"""
-		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
-		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
-
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 4 -o mean > ZW_dxy_denom
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 5 -o mean > ZW_dxy_nomin
-		
-		paste ZW_dxy_denom ZW_dxy_nomin > ZW_dxy_both
-		
-		awk '{{ print $1/$2 }}' ZW_dxy_both > {output}
-		
-		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_nomin ZW_dxy_both		
-		"""
-
 
 rule plot_all:
 	input:

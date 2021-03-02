@@ -1,0 +1,65 @@
+#!/usr/local/bin/python
+# Python 3
+# vcf_diploid_to_haploid_random.py
+# 21 January 2021
+# Mathias Scharmann
+
+
+# usage example
+# python vcf_diploid_to_haploid_random.py --vcf bla.vcf
+
+"""
+takes vcf with diploid genotypes and outputs haploid genotypes, randomly sampling a single allele from each diploid genotype
+=> pseudo-haploids to accomodate the Site Frequency Spectra of diploid selfers to a random-mating-like condition
+"""
+
+
+#import scipy.special
+import sys
+
+########################## HEAD
+def alldiffs (inlist): 
+	
+	seen = set()
+	diff = 0
+	for i in range(len(inlist)):
+		for j in range(len(inlist)):
+			if i != j:
+				pairstring = "-".join(sorted([str(x) for x in [i,j]]))
+				if not pairstring in seen:
+					if inlist[i] != inlist[j]:
+						diff += 1
+					seen.add( pairstring )	
+	print len(seen) # this is correct!
+	return diff	
+
+################################## MAIN
+
+for line in sys.stdin:
+	if line.startswith("#"):
+		continue
+	if len(line) < 2: # empty lines or so
+		continue
+	fields = line.strip("\n").split("\t")
+	outl = fields[:2]
+	gt_fields = fields[9:]
+	gts = "".join( [x.split(":")[0] for x in gt_fields] ).replace("/","")		
+	try:
+		alleles = set(gts)
+		alleles.discard(".")
+		n_alleles = len(alleles)
+	except TypeError:
+		n_alleles = 3 # dummy
+	if n_alleles <= 2:	# only bi-allelic or fixed sites
+		totlen = len(gts)
+		nt = totlen - gts.count(".")
+		n_pairs = (nt*(nt-1))/2 ## this is the site-specific denominator
+		count_p = gts.count(alleles.pop())  # count of a random allele , incl fixed sites!
+		# print count_p
+		countsproduct = ( count_p*( nt- count_p) )
+		# pi_combin will return the same result, but takes MUCH longer!
+		# pi_combin = alldiffs( [x for x in gts if x != "."] ) / scipy.special.binom(nt, 2)
+		outl += [str(countsproduct), str(n_pairs)]
+		sys.stdout.write("\t".join(outl) + "\n")
+						
+
