@@ -1,5 +1,5 @@
 popmapfile = "data/popmap.txt"
-windowsize = 2500
+windowsize = 2000
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
 regions_for_plot_bed = "data/Ychrom.bed"
@@ -58,28 +58,28 @@ print (samples_files_dict)
 
 rule all:
 	input:
-		"calls/all.post_filter.vcf.gz",
-		"calls/windows.multicov.F.txt",
-		"calls/windows.multicov.M.txt",
-		"calls/M_F_norm_coverage_ratio_log2.bed.txt",
-		"calls/plink.assoc_results.significant.window.bed.txt",
-		"calls/plink.assoc_results.assoc.raw.txt",
-		"calls/LD_r2_averaged_per_window.bed.txt",
-		"calls/F_specific_kmer.fa",
-		"calls/M_specific_kmer.fa",
-		"calls/kmers.F_specific.per_window.bed.txt",
-		"calls/kmers.M_specific.per_window.bed.txt",
-		"calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
-		"calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
-		"calls/MvF.dxy.bed.txt",
-		"calls/MvF.fst.bed.txt",
-		"calls/F.pi.bed.txt",
-		"calls/M.pi.bed.txt",
-		"calls/het_males.bed.txt",
-		"calls/het_females.bed.txt",
-		"calls/allstats.txt",
-		"calls/allstats.plots.pdf",
-		"calls/region.stats.plots.pdf"
+		"results_raw/all.post_filter.vcf.gz",
+		"results_processed/windows.multicov.F.txt",
+		"results_processed/windows.multicov.M.txt",
+		"results_processed/M_F_norm_coverage_ratio_log2.bed.txt",
+		"results_processed/plink.assoc_results.significant.window.bed.txt",
+		"results_raw/plink.assoc_results.assoc.raw.txt",
+		"results_processed/LD_r2_averaged_per_window.bed.txt",
+		"results_raw/F_specific_kmer.fa",
+		"results_raw/M_specific_kmer.fa",
+		"results_processed/kmers.F_specific.per_window.bed.txt",
+		"results_processed/kmers.M_specific.per_window.bed.txt",
+		"results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
+		"results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
+		"results_processed/MvF.dxy.bed.txt",
+		"results_processed/MvF.fst.bed.txt",
+		"results_processed/F.pi.bed.txt",
+		"results_processed/M.pi.bed.txt",
+		"results_processed/het_males.bed.txt",
+		"results_processed/het_females.bed.txt",
+		"results_processed/allstats.txt",
+		"results_processed/allstats.plots.pdf",
+		"results_processed/region.stats.plots.pdf"
 
 
 
@@ -232,7 +232,7 @@ rule merge_vcfs:
 	input:
 		region_vcfs=merge_vcfs_input # refers to the function above which evaluates the checkpoint
 	output:
-		"calls/all.pre_filter.vcf.gz"
+		"results_raw/all.pre_filter.vcf.gz"
 	threads: 3
 	shell:
 		"""
@@ -246,9 +246,9 @@ rule merge_vcfs:
 
 rule VCF_get_mean_depth_per_site:
 	input:
-		"calls/all.pre_filter.vcf.gz"
+		"results_raw/all.pre_filter.vcf.gz"
 	output:
-		"calls/meandepthpersite.txt"
+		"results_raw/meandepthpersite.txt"
 	threads: 2
 	shell:
 		"""
@@ -284,10 +284,10 @@ rule VCF_get_mean_depth_per_site:
 	
 rule VCF_filter_variants:
 	input:
-		mdps="calls/meandepthpersite.txt",
-		gzvcf="calls/all.pre_filter.vcf.gz"
+		mdps="results_raw/meandepthpersite.txt",
+		gzvcf="results_raw/all.pre_filter.vcf.gz"
 	output:
-		"calls/variant_sites.vcf.gz"
+		"results_raw/variant_sites.vcf.gz"
 	params:
 		MISS=0.1,
 		QUAL=20,
@@ -317,10 +317,10 @@ rule VCF_filter_variants:
 
 rule VCF_filter_invariants:
 	input:
-		mdps="calls/meandepthpersite.txt",
-		gzvcf="calls/all.pre_filter.vcf.gz"
+		mdps="results_raw/meandepthpersite.txt",
+		gzvcf="results_raw/all.pre_filter.vcf.gz"
 	output:
-		"calls/invariant_sites.vcf.gz"
+		"results_raw/invariant_sites.vcf.gz"
 	params:
 		MISS=0.1,
 		QUAL=20,
@@ -350,10 +350,10 @@ rule VCF_filter_invariants:
 
 rule VCF_merge_post_filter:
 	input:
-		invar="calls/invariant_sites.vcf.gz",
-		var="calls/variant_sites.vcf.gz"
+		invar="results_raw/invariant_sites.vcf.gz",
+		var="results_raw/variant_sites.vcf.gz"
 	output:
-		"calls/all.post_filter.vcf.gz"
+		"results_raw/all.post_filter.vcf.gz"
 	shell:
 		"""
 		# combine the two VCFs using bcftools concat
@@ -367,9 +367,9 @@ rule get_coverage_in_windows:
 		bam=expand("mapped_reads/{sample}.sorted.bam", sample=SAMPLES),
 		bai=expand("mapped_reads/{sample}.sorted.bam.bai", sample=SAMPLES)
 	output:
-		fcov="calls/windows.multicov.F.txt",
-		mcov="calls/windows.multicov.M.txt",
-		log2ratio="calls/M_F_norm_coverage_ratio_log2.bed.txt"
+		fcov="results_processed/windows.multicov.F.txt",
+		mcov="results_processed/windows.multicov.M.txt",
+		log2ratio="results_processed/M_F_norm_coverage_ratio_log2.bed.txt"
 	threads: 2
 	shell:
 		"""
@@ -404,55 +404,63 @@ rule get_coverage_in_windows:
 rule pi_rawstats_M:
 	input:
 		popmap={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
+		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"calls/pi_raw.M.txt"		
+		"results_raw/pi_raw.M.txt"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
+		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
 		rm mpop_pi
 		"""
 
 rule pi_rawstats_F:
 	input:
 		popmap={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
+		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"calls/pi_raw.F.txt"		
+		"results_raw/pi_raw.F.txt"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
+		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
 		rm fpop_pi
 		"""
 
 rule pi_windowed:
 	input:
-		pim="calls/pi_raw.M.txt",
-		pif="calls/pi_raw.F.txt",
+		pim="results_raw/pi_raw.M.txt",
+		pif="results_raw/pi_raw.F.txt",
 		fa=genomefile
 	output:
-		pi_f_bed="calls/F.pi.bed.txt",
-		pi_m_bed="calls/M.pi.bed.txt"		
+		pi_f_bed="results_processed/F.pi.bed.txt",
+		pi_m_bed="results_processed/M.pi.bed.txt"		
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.pi.txt
 		bedtools makewindows -w {windowsize} -g genomefile.pi.txt > windows.pi.bed
 		
-		# NOT yet correct...
-		bedtools map -a windows.pi.bed -b {input.pim} -c 4 -o mean > {output.pi_m_bed}
-		bedtools map -a windows.pi.bed -b {input.pif} -c 4 -o mean > {output.pi_f_bed}
+		# MALE
+		bedtools map -a windows.pi.bed -b {input.pim} -c 4 -o mean > pi_num
+		bedtools map -a windows.pi.bed -b {input.pim} -c 5 -o mean > pi_denom
+		paste pi_num pi_denom > pi_both		
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both > {output.pi_m_bed}
+
+		# FEMALE
+		bedtools map -a windows.pi.bed -b {input.pif} -c 4 -o mean > pi_num
+		bedtools map -a windows.pi.bed -b {input.pif} -c 5 -o mean > pi_denom
+		paste pi_num pi_denom > pi_both		
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both > {output.pi_f_bed}
 		
-		rm genomefile.pi.txt windows.pi.bed
+		rm genomefile.pi.txt windows.pi.bed pi_both pi_num pi_denom
 		"""
 
 rule dxy_rawstats:
 	input:
 		popmap={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
+		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"calls/dxy_raw.txt"		
+		"results_raw/dxy_raw.txt"		
 	shell:
 		"""
 		zcat {input.gzvcf} | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} > {output}
@@ -460,47 +468,47 @@ rule dxy_rawstats:
 
 rule dxy_windowed:
 	input:
-		raw="calls/dxy_raw.txt",
+		raw="results_raw/dxy_raw.txt",
 		fa=genomefile
 	output:
-		"calls/MvF.dxy.bed.txt"
+		"results_processed/MvF.dxy.bed.txt"
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.dxy.txt
 		bedtools makewindows -w {windowsize} -g genomefile.dxy.txt > windows.dxy.bed
 		
-		# NOT yet correct...
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 4 -o mean > dxy_denom
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 5 -o mean > dxy_nomin
+		# correct
+		bedtools map -a windows.dxy.bed -b {input.raw} -c 4 -o mean > dxy_num
+		bedtools map -a windows.dxy.bed -b {input.raw} -c 5 -o mean > dxy_denom
 		
-		paste dxy_denom dxy_nomin > dxy_both
+		paste dxy_num dxy_denom > dxy_both
 		
-		awk '{{ print $1/$2 }}' dxy_both > {output}
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' dxy_both > {output}
 		
-		rm genomefile.dxy.txt windows.dxy.bed dxy_denom dxy_nomin dxy_both
+		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both
 		"""
 
 rule fst_rawstats:
 	input:
 		popmap={popmapfile},
-		gzvcf="calls/variants.vcf.gz"
+		gzvcf="results_raw/variant_sites.vcf.gz"
 	output:
-		"calls/fst_raw.txt"		
+		"results_raw/fst_raw.txt"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_fst
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_fst
 
-		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst--weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}'> {output}
+		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}'> {output}
 		rm mpop_fst fpop_fst
 		"""
 
 rule fst_windowed:
 	input:
-		fraw="calls/fst_raw.txt",
+		fraw="results_raw/fst_raw.txt",
 		fa=genomefile
 	output:
-		"calls/MvF.fst.bed.txt"
+		"results_processed/MvF.fst.bed.txt"
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.fst.txt
@@ -515,11 +523,11 @@ rule fst_windowed:
 rule GWAS_plink:
 	input:
 		popmap={popmapfile},
-		gzvcf="calls/variant_sites.vcf.gz",
+		gzvcf="results_raw/variant_sites.vcf.gz",
 		fa=genomefile
 	output:
-		plinkassoc="calls/plink.assoc_results.significant.window.bed.txt",
-		rawplink="calls/plink.assoc_results.assoc.raw.txt"
+		plinkassoc="results_processed/plink.assoc_results.significant.window.bed.txt",
+		rawplink="results_raw/plink.assoc_results.assoc.raw.txt"
 	resources:
 		mem_mb=20000,
 		cpus=4
@@ -555,10 +563,10 @@ rule GWAS_plink:
 
 rule LD_plink:
 	input:
-		gzvcf="calls/variant_sites.vcf.gz",
+		gzvcf="results_raw/variant_sites.vcf.gz",
 		fa=genomefile
 	output:
-		"calls/LD_r2_averaged_per_window.bed.txt"
+		"results_processed/LD_r2_averaged_per_window.bed.txt"
 	resources:
 		mem_mb=20000,
 		cpus=4
@@ -609,10 +617,10 @@ rule kmerGO:
 		popm={popmapfile},
 		SamReMap={samples_reads_map}
 	output:
-		fkmer="calls/F_specific_kmer.fa",
-		mkmer="calls/M_specific_kmer.fa",
-		fcont="calls/F_specific.fa.cap.contigs",
-		mcont="calls/M_specific.fa.cap.contigs"
+		fkmer="results_raw/F_specific_kmer.fa",
+		mkmer="results_raw/M_specific_kmer.fa",
+		fcont="results_raw/F_specific.fa.cap.contigs",
+		mcont="results_raw/M_specific.fa.cap.contigs"
 	threads: 14
 	shell:
 		"""
@@ -657,11 +665,11 @@ rule match_kmers_to_genome:
 		popm={popmapfile},
 		fa=genomefile,
 		gidx=genomefile +".bwt",
-		fkmers="calls/F_specific_kmer.fa",
-		mkmers="calls/M_specific_kmer.fa"
+		fkmers="results_raw/F_specific_kmer.fa",
+		mkmers="results_raw/M_specific_kmer.fa"
 	output:
-		fsp="calls/kmers.F_specific.per_window.bed.txt",
-		msp="calls/kmers.M_specific.per_window.bed.txt"
+		fsp="results_processed/kmers.F_specific.per_window.bed.txt",
+		msp="results_processed/kmers.M_specific.per_window.bed.txt"
 	shell:
 		"""
 		# searching for perfect matches of 21-mers: https://bioinformatics.stackexchange.com/questions/7298/mapping-heteryzygous-kmers-on-a-genome
@@ -692,10 +700,10 @@ rule match_kmers_to_genome:
 rule calculate_freqs:
 	input:
 		popm={popmapfile},
-		gzvcf="calls/all.post_filter.vcf.gz"
+		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		mfreq="calls/freq_males.txt.gz",
-		ffreq="calls/freq_females.txt.gz"
+		mfreq="results_raw/freq_males.txt.gz",
+		ffreq="results_raw/freq_females.txt.gz"
 	shell:
 		"""
 		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --freq --stdout | gzip > {output.mfreq}
@@ -705,10 +713,10 @@ rule calculate_freqs:
 rule calc_indiv_het:
 	input:
 		popm={popmapfile},
-		gzvcf="calls/variant_sites.vcf.gz"
+		gzvcf="results_raw/variant_sites.vcf.gz"
 	output:
-		mhet="calls/het_males.txt",
-		fhet="calls/het_females.txt"
+		mhet="results_raw/het_males.txt",
+		fhet="results_raw/het_females.txt"
 	shell:
 		"""
 		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.mhet}
@@ -718,11 +726,11 @@ rule calc_indiv_het:
 rule indiv_het_per_windows:
 	input:
 		fa=genomefile,
-		mhet="calls/het_males.txt",
-		fhet="calls/het_females.txt"		
+		mhet="results_raw/het_males.txt",
+		fhet="results_raw/het_females.txt"		
 	output:
-		mhetwindows="calls/het_males.bed.txt",
-		fhetwindows="calls/het_females.bed.txt"
+		mhetwindows="results_processed/het_males.bed.txt",
+		fhetwindows="results_processed/het_females.bed.txt"
 	shell:
 		"""	
 		# create windows, sort chroms lexicographically (same as the LD output)
@@ -738,11 +746,11 @@ rule indiv_het_per_windows:
 	
 rule pseudo_phase_gametologs:
 	input:
-		mfreq="calls/freq_males.txt.gz",
-		ffreq="calls/freq_females.txt.gz",
-		gzvcf="calls/all.post_filter.vcf.gz"
+		mfreq="results_raw/freq_males.txt.gz",
+		ffreq="results_raw/freq_females.txt.gz",
+		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
+		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	shell:
 		"""
 		python scripts/pseudo_phase_gametologs.py {input.mfreq} {input.ffreq} {input.gzvcf} | bgzip -c > {output}
@@ -750,9 +758,9 @@ rule pseudo_phase_gametologs:
 	
 rule score_XY_gametolog_divergence:
 	input:
-		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
+		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.XY_divergence.rawstats.txt"
+		"results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt"
 	shell:
 		"""
 		echo -e "XY_Y_like\\tXY_Y_like" > xypopm
@@ -761,15 +769,15 @@ rule score_XY_gametolog_divergence:
 		echo -e "XY_X_like" > xypop
 		echo -e "XY_Y_like" >> xypop
 
-		vcftools --gzvcf {input} --keep xypop --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm > {output}
+		vcftools --gzvcf {input} --keep xypop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm > {output}
 		rm xypopm xypop
 		"""
 
 rule score_ZW_gametolog_divergence:
 	input:
-		"calls/gametolog_candidate_alleles.allsites.vcf.gz"
+		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"calls/gametolog_candidate_alleles.ZW_divergence.rawstats.txt"
+		"results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt"
 	shell:
 		"""
 		echo -e "ZW_W_like\\tZW_W_like" > zwpopm
@@ -778,74 +786,74 @@ rule score_ZW_gametolog_divergence:
 		echo -e "ZW_W_like" > zwpop
 		echo -e "ZW_Z_like" >> zwpop
 
-		vcftools --gzvcf {input} --keep zwpop --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm > {output}
+		vcftools --gzvcf {input} --keep zwpop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm > {output}
 		rm zwpopm zwpop
 		"""
 
 rule XY_div_windows:
 	input:
-		raw="calls/gametolog_candidate_alleles.XY_divergence.rawstats.txt",
+		raw="results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt",
 		fa=genomefile
 	output:
-		"calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
+		"results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
 
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 4 -o mean > XY_dxy_denom
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 5 -o mean > XY_dxy_nomin
+		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 4 -o mean > XY_dxy_num
+		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 5 -o mean > XY_dxy_denom
 		
-		paste XY_dxy_denom XY_dxy_nomin > XY_dxy_both
+		paste XY_dxy_num XY_dxy_denom > XY_dxy_both
 		
-		awk '{{ print $1/$2 }}' XY_dxy_both > {output}
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' XY_dxy_both > {output}
 		
-		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_nomin XY_dxy_both		
+		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both		
 		"""
 
 rule ZW_div_windows:
 	input:
-		raw="calls/gametolog_candidate_alleles.ZW_divergence.rawstats.txt",
+		raw="results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt",
 		fa=genomefile
 	output:
-		"calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
+		"results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
 
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 4 -o mean > ZW_dxy_denom
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 5 -o mean > ZW_dxy_nomin
+		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 4 -o mean > ZW_dxy_num
+		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 5 -o mean > ZW_dxy_denom
 		
-		paste ZW_dxy_denom ZW_dxy_nomin > ZW_dxy_both
+		paste ZW_dxy_num ZW_dxy_denom > ZW_dxy_both
 		
-		awk '{{ print $1/$2 }}' ZW_dxy_both > {output}
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' ZW_dxy_both > {output}
 		
-		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_nomin ZW_dxy_both		
+		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both		
 		"""
 
 
 rule plot_all:
 	input:
 		regions=regions_for_plot_bed,
-		a="calls/M_F_norm_coverage_ratio_log2.bed.txt",
-		b="calls/kmers.F_specific.per_window.bed.txt",
-		c="calls/kmers.M_specific.per_window.bed.txt",
-		d="calls/F.pi.bed.txt",
-		e="calls/M.pi.bed.txt",
-		f="calls/MvF.fst.bed.txt",
-		g="calls/MvF.dxy.bed.txt",
-		h="calls/LD_r2_averaged_per_window.bed.txt",
-		i="calls/plink.assoc_results.significant.window.bed.txt",
-		j="calls/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
-		k="calls/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
-		l="calls/het_males.bed.txt",
-		m="calls/het_females.bed.txt" 
+		a="results_processed/M_F_norm_coverage_ratio_log2.bed.txt",
+		b="results_processed/kmers.F_specific.per_window.bed.txt",
+		c="results_processed/kmers.M_specific.per_window.bed.txt",
+		d="results_processed/F.pi.bed.txt",
+		e="results_processed/M.pi.bed.txt",
+		f="results_processed/MvF.fst.bed.txt",
+		g="results_processed/MvF.dxy.bed.txt",
+		h="results_processed/LD_r2_averaged_per_window.bed.txt",
+		i="results_processed/plink.assoc_results.significant.window.bed.txt",
+		j="results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
+		k="results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
+		l="results_processed/het_males.bed.txt",
+		m="results_processed/het_females.bed.txt" 
 	output:
-		stats="calls/allstats.txt",
-		regionstats="calls/region.stats.txt",
-		plot="calls/allstats.plots.pdf",
-		regionplot="calls/region.stats.plots.pdf"
+		stats="results_processed/allstats.txt",
+		regionstats="results_processed/region.stats.txt",
+		plot="results_processed/allstats.plots.pdf",
+		regionplot="results_processed/region.stats.plots.pdf"
 	shell:
 		"""
 		cat {input.a} > {output.stats}

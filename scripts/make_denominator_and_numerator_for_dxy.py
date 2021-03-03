@@ -87,21 +87,25 @@ for line in sys.stdin:
 	elif len(line) < 2: # empty lines or so
 		continue
 	fields = line.strip("\n").split("\t")
-	outl = fields[:2]
+	outl = fields[:2] + [fields[1]]
 	gt_fields = fields[9:]
 	gts_p1 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[0]]]] ).replace("/","")		
 	gts_p2 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[1]]]] ).replace("/","")
 	try:
 		alleles = set(gts_p1)
-		alleles.add( gts_p2 )
+		alleles = alleles.union( set(gts_p2) )
 		alleles.discard(".")
 		n_alleles = len(alleles)
-	except TypeError:
+	except TypeError: 
+		alleles = set()
 		n_alleles = 3 # dummy
-	if n_alleles <= 2:	# only bi-allelic or fixed sites
+	if n_alleles in set([1,2]):	# only bi-allelic or fixed sites, NOT MISSING SITES
 		n_pairs = len(gts_p1) * len(gts_p2) ## this is the site-specific denominator
-		count_p1 = gts_p1.count(alleles.pop())  # count of a random allele , incl fixed sites!
-		count_p2 = gts_p2.count(alleles.pop())  # count THE OTHER ALLELE
+		count_p1 = gts_p1.count(alleles.pop())  # count of a random allele , fixed sites cause KeyError
+		try:
+			count_p2 = gts_p2.count(alleles.pop())  # count THE OTHER ALLELE
+		except KeyError:
+			count_p2 = 0
 		# print count_p
 		countsproduct = ( count_p1*count_p2)
 		# pi_combin will return the same result, but takes MUCH longer!

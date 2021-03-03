@@ -41,7 +41,7 @@ for line in sys.stdin:
 	if len(line) < 2: # empty lines or so
 		continue
 	fields = line.strip("\n").split("\t")
-	outl = fields[:2]
+	outl = fields[:2] + [fields[1]]
 	gt_fields = fields[9:]
 	gts = "".join( [x.split(":")[0] for x in gt_fields] ).replace("/","")		
 	try:
@@ -50,7 +50,7 @@ for line in sys.stdin:
 		n_alleles = len(alleles)
 	except TypeError:
 		n_alleles = 3 # dummy
-	if n_alleles <= 2:	# only bi-allelic or fixed sites
+	if n_alleles in set([1,2]):	# only bi-allelic or fixed sites, NOT MISSING SITES
 		totlen = len(gts)
 		nt = totlen - gts.count(".")
 		n_pairs = (nt*(nt-1))/2 ## this is the site-specific denominator
