@@ -1,5 +1,5 @@
 popmapfile = "data/popmap.txt"
-windowsize = 2000
+windowsize = 250
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
 regions_for_plot_bed = "data/Ychrom.bed"
@@ -520,14 +520,13 @@ rule fst_windowed:
 		"""
 
 	
-rule GWAS_plink:
+rule GWAS_plink_raw:
 	input:
 		popmap={popmapfile},
 		gzvcf="results_raw/variant_sites.vcf.gz",
 		fa=genomefile
 	output:
-		plinkassoc="results_processed/plink.assoc_results.significant.window.bed.txt",
-		rawplink="results_raw/plink.assoc_results.assoc.raw.txt"
+		"results_raw/plink.assoc_results.assoc.raw.txt"
 	resources:
 		mem_mb=20000,
 		cpus=4
@@ -548,25 +547,41 @@ rule GWAS_plink:
 		cat ../{input.popmap} | awk 'NF {{print $1"\\t"$1"\\t"$2}}' > thepheno
 		plink --vcf ../{input.gzvcf} --double-id --allow-extra-chr --pheno thepheno --allow-no-sex --assoc --out assoc_results	--threads {resources.cpus} --memory {resources.mem_mb} 
 		
-		cat assoc_results.assoc | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
-		mv assoc_results.assoc ../{output.rawplink}
-
-		cat plink.assoc_results.significant.txt | cut -f1,3,9 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
-
-		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
-		bedtools makewindows -w {windowsize} -g genomefile.assoc.txt > windows.assoc.bed
-		bedtools coverage -counts -a windows.assoc.bed -b plink.assoc_results.significant.bed > ../{output.plinkassoc}
-
+		mv assoc_results.assoc ../{output}
 		cd ../
 		rm -r tmpdir_plink_GWAS	
 		"""
 
-rule LD_plink:
+
+rule GWAS_plink_windows:
+	input:
+		fa=genomefile,
+		rawgwas="results_raw/plink.assoc_results.assoc.raw.txt"
+	output:
+		"results_processed/plink.assoc_results.significant.window.bed.txt",
+	resources:
+		mem_mb=20000,
+		cpus=4
+	shell:
+		"""
+		cat {input.rawgwas} | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
+
+		cat plink.assoc_results.significant.txt | cut -f1,3,9 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
+
+		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
+		bedtools makewindows -w {windowsize} -g genomefile.assoc.txt > windows.assoc.bed
+		bedtools coverage -counts -a windows.assoc.bed -b plink.assoc_results.significant.bed > {output}
+
+		rm plink.assoc_results.significant.txt plink.assoc_results.significant.bed genomefile.assoc.txt windows.assoc.bed 
+		"""
+
+rule LD_plink_raw:
 	input:
 		gzvcf="results_raw/variant_sites.vcf.gz",
 		fa=genomefile
 	output:
-		"results_processed/LD_r2_averaged_per_window.bed.txt"
+		"results_raw/ld_clean.sorted.bed.gz"
+#		"results_processed/LD_r2_averaged_per_window.bed.txt"
 	resources:
 		mem_mb=20000,
 		cpus=4
@@ -595,20 +610,35 @@ rule LD_plink:
 		# --ld-window-kb X	compute LD only for pairs that are at most X kb apart (default 1000 kb)
 		# --ld-window-r2 X	minimum r2 to report, else omit from output. Default = 0.2
 
-		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > ld_clean.sorted.bed > ld_clean.sorted.bed
-
+		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n | gzip -c > ../{output}
+		cd ../
+		rm -r tmpdir_plink_LD
+		"""
+		
+rule LD_plink_windows:
+	input:
+		ldraw="results_raw/ld_clean.sorted.bed.gz",
+		fa=genomefile
+	output:
+		"results_processed/LD_r2_averaged_per_window.bed.txt"
+	resources:
+		mem_mb=20000,
+		cpus=4
+	shell:
+		"""
 		# create windows, sort chroms lexicographically (same as the LD output)
-		seqtk comp ../{input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
+		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
 		bedtools makewindows -w {windowsize} -g genomefile.ld.txt | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > windows.ld.bed
-
+		
+		gunzip --stdout {input.ldraw} > ld_clean.sorted.bed
+		
 		# get the mean LD per window
 		bedtools map -a windows.ld.bed -b ld_clean.sorted.bed -c 4 -o mean > tmpoutperwindow.txt
 
 		# sort chroms back to the same order as the genome file:
-		bedtools sort -g genomefile.ld.txt -i tmpoutperwindow.txt > ../{output}
+		bedtools sort -g genomefile.ld.txt -i tmpoutperwindow.txt > {output}
 
-		cd ../
-		rm -r tmpdir_plink_LD
+		rm ld_clean.sorted.bed genomefile.ld.txt tmpoutperwindow.txt windows.ld.bed
 		"""
 	
 	
