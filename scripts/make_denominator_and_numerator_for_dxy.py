@@ -100,7 +100,7 @@ for line in sys.stdin:
 		alleles = set()
 		n_alleles = 3 # dummy
 	if n_alleles in set([1,2]):	# only bi-allelic or fixed sites, NOT MISSING SITES
-		n_pairs = len(gts_p1) * len(gts_p2) ## this is the site-specific denominator
+		n_pairs = (len(gts_p1)-gts_p1.count(".")) * (len(gts_p2)-gts_p2.count(".")) ## this is the site-specific denominator; susbtract missing genotypes
 		count_p1 = gts_p1.count(alleles.pop())  # count of a random allele , fixed sites cause KeyError
 		try:
 			count_p2 = gts_p2.count(alleles.pop())  # count THE OTHER ALLELE
