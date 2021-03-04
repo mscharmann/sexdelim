@@ -1,5 +1,5 @@
 popmapfile = "data/popmap.txt"
-windowsize = 250
+windowsize = 1000
 genomefile = "data/fakegenome.MALE.fa"
 samples_reads_map = "data/samples_and_readfiles.txt"
 regions_for_plot_bed = "data/Ychrom.bed"
@@ -75,6 +75,8 @@ rule all:
 		"results_processed/MvF.fst.bed.txt",
 		"results_processed/F.pi.bed.txt",
 		"results_processed/M.pi.bed.txt",
+		"results_processed/MvF.netdiv_M.bed.txt",
+		"results_processed/MvF.netdiv_F.bed.txt",
 		"results_processed/het_males.bed.txt",
 		"results_processed/het_females.bed.txt",
 		"results_processed/allstats.txt",
@@ -488,6 +490,31 @@ rule dxy_windowed:
 		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both
 		"""
 
+
+rule netdiv_windowed:
+	input:
+		dxy="results_processed/MvF.dxy.bed.txt",
+		pi_f_bed="results_processed/F.pi.bed.txt",
+		pi_m_bed="results_processed/M.pi.bed.txt",		
+		fa=genomefile
+	output:
+		netdiv_M="results_processed/MvF.netdiv_M.bed.txt",
+		netdiv_F="results_processed/MvF.netdiv_F.bed.txt"
+	shell:
+		"""
+		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.netdiv.txt
+		bedtools makewindows -w {windowsize} -g genomefile.netdiv.txt > windows.netdiv.bed
+				
+		paste {input.dxy} {input.pi_m_bed} > netdiv_prep		
+		awk '{{ if($8!="NA" && $4!="NA") print $1"\\t"$2"\\t"$3"\\t"$4-$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' netdiv_prep > {output.netdiv_M}
+
+		paste {input.dxy} {input.pi_f_bed} > netdiv_prep		
+		awk '{{ if($8!="NA" && $4!="NA") print $1"\\t"$2"\\t"$3"\\t"$4-$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' netdiv_prep > {output.netdiv_F}
+		
+		rm genomefile.netdiv.txt windows.netdiv.bed netdiv_prep
+		"""
+
+
 rule fst_rawstats:
 	input:
 		popmap={popmapfile},
@@ -878,7 +905,9 @@ rule plot_all:
 		j="results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt",
 		k="results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt",
 		l="results_processed/het_males.bed.txt",
-		m="results_processed/het_females.bed.txt" 
+		m="results_processed/het_females.bed.txt",
+		n="results_processed/MvF.netdiv_F.bed.txt",
+		o="results_processed/MvF.netdiv_M.bed.txt"
 	output:
 		stats="results_processed/allstats.txt",
 		regionstats="results_processed/region.stats.txt",
@@ -888,7 +917,7 @@ rule plot_all:
 		"""
 		cat {input.a} > {output.stats}
 
-		for i in {input.b} {input.c} {input.d} {input.e} {input.f} {input.g} {input.h} {input.i} {input.j} {input.k} {input.l} {input.m} ; do
+		for i in {input.b} {input.c} {input.d} {input.e} {input.f} {input.g} {input.h} {input.i} {input.j} {input.k} {input.l} {input.m} {input.n} {input.o} ; do
 			paste {output.stats} <(cut -f4 $i ) > tmpst
 			mv tmpst {output.stats}
 		done
