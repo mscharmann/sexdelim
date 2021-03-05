@@ -437,24 +437,30 @@ rule pi_windowed:
 	output:
 		pi_f_bed="results_processed/F.pi.bed.txt",
 		pi_m_bed="results_processed/M.pi.bed.txt"		
+	threads: 4
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.pi.txt
 		bedtools makewindows -w {windowsize} -g genomefile.pi.txt > windows.pi.bed
 		
 		# MALE
-		bedtools map -a windows.pi.bed -b {input.pim} -c 4 -o mean > pi_num
-		bedtools map -a windows.pi.bed -b {input.pim} -c 5 -o mean > pi_denom
-		paste pi_num pi_denom > pi_both		
-		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both > {output.pi_m_bed}
+		(bedtools map -a windows.pi.bed -b {input.pim} -g genomefile.pi.txt -c 4 -o mean > pi_num_M )& 
+		(bedtools map -a windows.pi.bed -b {input.pim} -g genomefile.pi.txt -c 5 -o mean > pi_denom_M )&
 
 		# FEMALE
-		bedtools map -a windows.pi.bed -b {input.pif} -c 4 -o mean > pi_num
-		bedtools map -a windows.pi.bed -b {input.pif} -c 5 -o mean > pi_denom
-		paste pi_num pi_denom > pi_both		
-		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both > {output.pi_f_bed}
+		(bedtools map -a windows.pi.bed -b {input.pif} -g genomefile.pi.txt -c 4 -o mean > pi_num_F )&
+		(bedtools map -a windows.pi.bed -b {input.pif} -g genomefile.pi.txt -c 5 -o mean > pi_denom_F )&
 		
-		rm genomefile.pi.txt windows.pi.bed pi_both pi_num pi_denom
+		wait
+		
+		paste pi_num_M pi_denom_M > pi_both_M		
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_M > {output.pi_m_bed}
+
+
+		paste pi_num_F pi_denom_F > pi_both_F		
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_F > {output.pi_f_bed}
+		
+		rm genomefile.pi.txt windows.pi.bed pi_both pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F
 		"""
 
 rule dxy_rawstats:
@@ -474,14 +480,16 @@ rule dxy_windowed:
 		fa=genomefile
 	output:
 		"results_processed/MvF.dxy.bed.txt"
+	threads: 2
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.dxy.txt
 		bedtools makewindows -w {windowsize} -g genomefile.dxy.txt > windows.dxy.bed
 		
 		# correct
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 4 -o mean > dxy_num
-		bedtools map -a windows.dxy.bed -b {input.raw} -c 5 -o mean > dxy_denom
+		( bedtools map -a windows.dxy.bed -b {input.raw} -g genomefile.dxy.txt -c 4 -o mean > dxy_num )&
+		( bedtools map -a windows.dxy.bed -b {input.raw} -g genomefile.dxy.txt -c 5 -o mean > dxy_denom )&
+		wait
 		
 		paste dxy_num dxy_denom > dxy_both
 		
@@ -541,7 +549,7 @@ rule fst_windowed:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.fst.txt
 		bedtools makewindows -w {windowsize} -g genomefile.fst.txt > windows.fst.bed
 		
-		bedtools map -a windows.fst.bed -b {input.fraw} -c 4 -o mean > {output}
+		bedtools map -a windows.fst.bed -b {input.fraw} -g genomefile.fst.txt -c 4 -o mean > {output}
 		
 		rm genomefile.fst.txt windows.fst.bed		
 		"""
@@ -586,9 +594,6 @@ rule GWAS_plink_windows:
 		rawgwas="results_raw/plink.assoc_results.assoc.raw.txt"
 	output:
 		"results_processed/plink.assoc_results.significant.window.bed.txt",
-	resources:
-		mem_mb=20000,
-		cpus=4
 	shell:
 		"""
 		cat {input.rawgwas} | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
@@ -637,7 +642,7 @@ rule LD_plink_raw:
 		# --ld-window-kb X	compute LD only for pairs that are at most X kb apart (default 1000 kb)
 		# --ld-window-r2 X	minimum r2 to report, else omit from output. Default = 0.2
 
-		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n | gzip -c > ../{output}
+		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > ../{output}
 		cd ../
 		rm -r tmpdir_plink_LD
 		"""
@@ -655,7 +660,7 @@ rule LD_plink_windows:
 		"""
 		# create windows, sort chroms lexicographically (same as the LD output)
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
-		bedtools makewindows -w {windowsize} -g genomefile.ld.txt | sort --parallel {resources.cpus} -S {resources.mem_mb}M -T . -k1,1 -k2,2n > windows.ld.bed
+		bedtools makewindows -w {windowsize} -g genomefile.ld.txt | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n > windows.ld.bed
 		
 		gunzip --stdout {input.ldraw} > ld_clean.sorted.bed
 		
@@ -853,13 +858,15 @@ rule XY_div_windows:
 		fa=genomefile
 	output:
 		"results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
+	threads: 2
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
 
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 4 -o mean > XY_dxy_num
-		bedtools map -a windows.xygametologs.bed -b {input.raw} -c 5 -o mean > XY_dxy_denom
+		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 4 -o mean > XY_dxy_num )&
+		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 5 -o mean > XY_dxy_denom )&
+		wait
 		
 		paste XY_dxy_num XY_dxy_denom > XY_dxy_both
 		
@@ -874,14 +881,16 @@ rule ZW_div_windows:
 		fa=genomefile
 	output:
 		"results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
+	threads: 2
 	shell:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
 
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 4 -o mean > ZW_dxy_num
-		bedtools map -a windows.zwgametologs.bed -b {input.raw} -c 5 -o mean > ZW_dxy_denom
-		
+		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 4 -o mean > ZW_dxy_num )&
+		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 5 -o mean > ZW_dxy_denom )&
+		wait
+				
 		paste ZW_dxy_num ZW_dxy_denom > ZW_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' ZW_dxy_both > {output}
