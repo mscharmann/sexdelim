@@ -10,6 +10,12 @@
 
 """
 dxy
+
+	Nei & Li (1979): unnumbered eq., between eqs. 24 and 25 
+	Nei 1987 eq 10.20 
+	for a single biallelic SNP (1,2) in two pops it simplifies to: dxy = pop1_freq1 * ( 1.0 - pop2_freq1 ) + pop2_freq1 * ( 1.0 - pop1_freq1 )
+
+
 """
 
 
@@ -99,18 +105,20 @@ for line in sys.stdin:
 	except TypeError: 
 		alleles = set()
 		n_alleles = 3 # dummy
-	if n_alleles in set([1,2]):	# only bi-allelic or fixed sites, NOT MISSING SITES
+	# continue only for bi-allelic or fixed sites, NOT MISSING SITES
+	if n_alleles == 1: # fixed site
+		n_pairs = (len(gts_p1)-gts_p1.count(".")) * (len(gts_p2)-gts_p2.count("."))
+		outl += ["0", str(n_pairs)]
+		sys.stdout.write("\t".join(outl) + "\n")
+	elif n_alleles == 2: #  bi-allelic	
 		n_pairs = (len(gts_p1)-gts_p1.count(".")) * (len(gts_p2)-gts_p2.count(".")) ## this is the site-specific denominator; susbtract missing genotypes
-		count_p1 = gts_p1.count(alleles.pop())  # count of a random allele , fixed sites cause KeyError
-		try:
-			count_p2 = gts_p2.count(alleles.pop())  # count THE OTHER ALLELE
-		except KeyError:
-			count_p2 = 0
-		# print count_p
-		countsproduct = ( count_p1*count_p2)
-		# pi_combin will return the same result, but takes MUCH longer!
-		# pi_combin = alldiffs( [x for x in gts if x != "."] ) / scipy.special.binom(nt, 2)
-		outl += [str(countsproduct), str(n_pairs)]
+		alleles = list(alleles)
+		count_p_p1 = gts_p1.count(alleles[0])
+		count_q_p1 = gts_p1.count(alleles[1])
+		count_p_p2 = gts_p2.count(alleles[0])
+		count_q_p2 = gts_p2.count(alleles[1])
+		countsproduct_sum = ( count_p_p1*count_q_p2 ) + ( count_q_p1*count_p_p2 ) 
+		outl += [str(countsproduct_sum), str(n_pairs)]
 		sys.stdout.write("\t".join(outl) + "\n")
 						
 
