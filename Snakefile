@@ -460,7 +460,7 @@ rule pi_windowed:
 		paste pi_num_F pi_denom_F > pi_both_F		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_F > {output.pi_f_bed}
 		
-		rm genomefile.pi.txt windows.pi.bed pi_both pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F
+		rm genomefile.pi.txt windows.pi.bed pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F
 		"""
 
 rule dxy_rawstats:

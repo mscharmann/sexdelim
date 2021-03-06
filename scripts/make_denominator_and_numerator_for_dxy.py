@@ -93,7 +93,9 @@ for line in sys.stdin:
 	elif len(line) < 2: # empty lines or so
 		continue
 	fields = line.strip("\n").split("\t")
-	outl = fields[:2] + [fields[1]]
+	outl = [fields[0],str(int(fields[1])-1), fields[1]]
+	# convert from 1-based, closed [start, end] Variant Call Format v4 (VCF)
+	# to sorted, 0-based, half-open [start-1, end) extended BED data
 	gt_fields = fields[9:]
 	gts_p1 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[0]]]] ).replace("/","")		
 	gts_p2 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[1]]]] ).replace("/","")
