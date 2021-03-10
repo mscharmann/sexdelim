@@ -82,6 +82,13 @@
         "CPUs" : 1,
         "RAM_memory" : "2G",
         "partition" : "axiom"
+    },
+    "dxy_rawstats" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "axiom"
     }
 }
 
