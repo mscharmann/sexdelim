@@ -1,20 +1,46 @@
 ## pseudo_phase_gametologs.py
 
-import random, gzip, sys, numpy as np
+import gzip, sys
 
-mfreqfile = sys.argv[1]
-ffreqfile = sys.argv[2]
-gzvcffile = sys.argv[3]
+def read_popmap (infile):
+	
+	popdict = {}
+	with open(infile, "r") as INF:
+		for line in INF:
+			if len( line ) > 2:
+				fields = line.strip("\n").split("\t")
+				try:
+					popdict[ fields[1] ].append( fields[0] )
+				except KeyError:
+					popdict[ fields[1] ] = [ fields[0] ]
+	return popdict				
 
-m_vcf_freqs_file = gzip.open(mfreqfile, "rt")
-f_vcf_freqs_file = gzip.open(ffreqfile, "rt")
 
-m_vcf_freqs_file.readline()
-f_vcf_freqs_file.readline()
+def get_major_allele (gts_p1, gts_p2):
+	nomiss = list( (gts_p1 + gts_p2).replace(".", "") )
+	return max(set(nomiss), key = nomiss.count) 
+	
+
+
+popmapfile = sys.argv[1]
+gzvcffile = sys.argv[2]
+
+popdict = read_popmap(popmapfile)
 
 vcf_infile = gzip.open(gzvcffile, "rt")
 for line in vcf_infile: # discard the header!
 	if line.startswith("#CHROM"):
+		header_line = line.lstrip("#").strip("\n").split("\t")
+		samples = sorted(header_line[9:])
+		popdict_vcf_idx = {}
+		for pop in popdict.keys():
+			for sample in  popdict[pop]:
+				vcf_idx = header_line.index(sample)
+				try:
+					popdict_vcf_idx[pop].append(vcf_idx)
+				except KeyError:
+					popdict_vcf_idx[pop] = [vcf_idx]
+		pops = sorted(popdict.keys())
 		break
 
 vcf_header = ["##fileformat=VCFv4.2",
@@ -26,142 +52,140 @@ vcf_header = ["##fileformat=VCFv4.2",
 
 sys.stdout.write( "\n".join(vcf_header) + "\n" )
 
-for vcfline, mline, fline in zip(vcf_infile, m_vcf_freqs_file, f_vcf_freqs_file) :
-	fields = vcfline.strip("\n").split("\t")
+
+#print(popdict_vcf_idx)
+
+
+for line in vcf_infile :
+	fields = line.strip("\n").split("\t")
 	chrom = fields[0]
 	pos = fields[1]
 	refallele = fields[3]
 	altallele = fields[4]
-	mfields = mline.strip("\n").split("\t")
-	ffields = fline.strip("\n").split("\t")
-	mfreq_p = float(mfields[4].split(":")[1])
-	ffreq_p = float(ffields[4].split(":")[1])
-	if altallele == ".": # fixed sites 
-		if np.isnan(mfreq_p):
-			if np.isnan(ffreq_p):
+	gt_fields = fields[9:]
+	gts_p1 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[0]]]] ).replace("/","")		
+	gts_p2 = "".join( [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx[pops[1]]]] ).replace("/","")
+	pres_M = float((len(gts_p1)-gts_p1.count(".")))
+	pres_F = float((len(gts_p2)-gts_p2.count(".")))
+	
+	major_allele = get_major_allele (gts_p1, gts_p2)
+	hom_maj = major_allele + "/" + major_allele
+	
+	try:
+		alleles = set(gts_p1)
+		alleles = alleles.union( set(gts_p2) )
+		alleles.discard(".")
+		n_alleles = len(alleles)
+	except TypeError: 
+		alleles = set()
+		n_alleles = 3 # dummy
+
+	# continue only for bi-allelic or fixed sites, NOT MISSING SITES
+	if n_alleles == 1: # fixed site, may or may not have missing data
+		alleles = list(alleles)
+		if pres_M == 0:
+			if pres_F == 0:
 				# both absent; in a correctly fitlered input VCF this case shoud never occur.
 				sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", "./.", "./.", "./.", "./." ]) + "\n" )
 			else:
 				# F present, M absent: can not have Y-like or Z-like; X-like and W-like are fine!
+				# they are assigned the major allele
 				XY_Y_like = "./."
 				ZW_Z_like = "./."
-				XY_X_like = "0/0"
-				ZW_W_like = "0/0"
+				XY_X_like = hom_maj
+				ZW_W_like = hom_maj
 				sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", XY_Y_like, XY_X_like, ZW_W_like, ZW_Z_like ]) + "\n" )
-		elif np.isnan(ffreq_p):
+		elif pres_F == 0:
 			# F absent, M present: : can not have X-like or W-like; Y-like and Z-like are fine!
-			XY_Y_like = "0/0"
-			ZW_Z_like = "0/0"
+			# they are assigned the major allele
+			XY_Y_like = hom_maj
+			ZW_Z_like = hom_maj
 			XY_X_like = "./."
 			ZW_W_like = "./."
 			sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", XY_Y_like, XY_X_like, ZW_W_like, ZW_Z_like ]) + "\n" )
 		else:
 			# both present	
-			sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", "0/0", "0/0", "0/0", "0/0" ]) + "\n" )
-	else: # variable sites
-		mfreq_q = float(mfields[5].split(":")[1])
-		ffreq_q = float(ffields[5].split(":")[1])
-		m_p = mfields[4].split(":")[0]
-		m_q = mfields[5].split(":")[0]
-		f_p = ffields[4].split(":")[0]
-		f_q = ffields[5].split(":")[0]
-		if np.isnan(mfreq_p):
-			if np.isnan(ffreq_p):
+			sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", hom_maj, hom_maj, hom_maj, hom_maj ]) + "\n" )
+
+	elif n_alleles == 2: #  bi-allelic site; may or may not have missing data
+		alleles = list(alleles)
+		if pres_M == 0:
+			if pres_F == 0:
 				# both absent; in a correctly fitlered input VCF this case shoud never occur.
-				sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", "./.", "./.", "./.", "./." ]) + "\n" )
-			else:
-				# F present, M absent: can not have Y-like or Z-like; X-like and W-like are fine!
 				XY_Y_like = "./."
 				ZW_Z_like = "./."
-				if ffreq_p >= ffreq_q:
-					XY_X_like = f_p
-				else:
-					XY_X_like = f_q
-				if ffreq_p >= 0.4 and mfreq_p == 0.0:
-					ZW_W_like = f_p
-				elif ffreq_q >= 0.4 and mfreq_q == 0.0:
-					ZW_W_like = f_q
-				else:
-					ZW_W_like = random.choice([f_p,f_q])
-				if XY_X_like == refallele:
-					s2 = "0/0"
-				else:
-					s2 = "1/1"
-				if ZW_W_like == refallele:
-					s3 = "0/0"
-				else:
-					s3 = "1/1"
-				sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", XY_Y_like, s2, s3, ZW_Z_like ]) + "\n" )
-		elif np.isnan(ffreq_p):
-			# F absent, M present: : can not have X-like or W-like; Y-like and Z-like are fine!
+				XY_X_like = "./."
+				ZW_W_like = "./."
+			else:
+				# F present, M absent: can not have Y-like or Z-like; X-like and W-like are fine
+				# they are assigned the major allele
+				XY_Y_like = "./."
+				ZW_Z_like = "./."
+				XY_X_like = hom_maj
+				ZW_W_like = hom_maj
+
+		elif pres_F == 0:
+			# F absent, M present: : can not have X-like or W-like; Y-like and Z-like are fine; 
+			# they are assigned the major allele
 			XY_X_like = "./."
 			ZW_W_like = "./."
-			if mfreq_p >= 0.4 and ffreq_p == 0.0:
-				XY_Y_like = m_p
-			elif mfreq_q >= 0.4 and ffreq_q == 0.0:
-				XY_Y_like = m_q
-			else:
-				XY_Y_like = random.choice([m_p,m_q])
-			if mfreq_p >= mfreq_q:
-				ZW_Z_like = m_p
-			else:
-				ZW_Z_like = m_q
-			if XY_Y_like == refallele:
-				s1 = "0/0"
-			else:
-				s1 = "1/1"
-			if ZW_Z_like == refallele:
-				s4 = "0/0"
-			else:
-				s4 = "1/1"
-			sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", s1, XY_X_like, ZW_W_like, s4 ]) + "\n" )
+			XY_Y_like = hom_maj
+			ZW_Z_like = hom_maj
+
 		else:
-			# both present	
-			if ffreq_p >= ffreq_q:
-				XY_X_like = f_p
-			else:
-				XY_X_like = f_q
-			if mfreq_p >= 0.4 and ffreq_p == 0.0:
-				XY_Y_like = m_p
-			elif mfreq_q >= 0.4 and ffreq_q == 0.0:
-				XY_Y_like = m_q
-			else:
-				XY_Y_like = random.choice([m_p,m_q])
-			# print (XY_Y_like, XY_X_like)
-			if ffreq_p >= 0.4 and mfreq_p == 0.0:
-				ZW_W_like = f_p
-			elif ffreq_q >= 0.4 and mfreq_q == 0.0:
-				ZW_W_like = f_q
-			else:
-				ZW_W_like = random.choice([f_p,f_q])
-			if mfreq_p >= mfreq_q:
-				ZW_Z_like = m_p
-			else:
-				ZW_Z_like = m_q
-			# print (ZW_W_like, ZW_Z_like)
-			# order of "samples" in output vcf: "XY_Y_like","XY_X_like","ZW_W_like","ZW_Z_like"
-			if XY_Y_like == refallele:
-				s1 = "0/0"
-			else:
-				s1 = "1/1"
-			if XY_X_like == refallele:
-				s2 = "0/0"
-			else:
-				s2 = "1/1"
-			if ZW_W_like == refallele:
-				s3 = "0/0"
-			else:
-				s3 = "1/1"
-			if ZW_Z_like == refallele:
-				s4 = "0/0"
-			else:
-				s4 = "1/1"
-			# vcf_outfile.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", s1, s2, s3, s4 ]) + "\n")
-			sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", s1, s2, s3, s4 ]) + "\n" )
+			# both present; now investigate heterozygosity and frequency in either sex	
+			freq_0_p1 = gts_p1.count(alleles[0]) / float((len(gts_p1)-gts_p1.count(".")))
+			freq_1_p1 = gts_p1.count(alleles[1]) / float((len(gts_p1)-gts_p1.count(".")))
+			freq_0_p2 = gts_p2.count(alleles[0]) / float((len(gts_p2)-gts_p2.count(".")))
+			freq_1_p2 = gts_p2.count(alleles[1]) / float((len(gts_p2)-gts_p2.count(".")))
+			gts_p1 = [y.split("/") for y in [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx["1"]]]]
+			gts_p2 = [y.split("/") for y in [x.split(":")[0] for x in [fields[i] for i in popdict_vcf_idx["2"]]]]
+			het_males = len([x for x in gts_p1 if x[0] != x[1]]) / float( len(gts_p1) )
+			het_females = len([x for x in gts_p2 if x[0] != x[1]]) / float( len(gts_p2) )
+			if het_males == 1.0:
+				if freq_0_p2 == 1:
+					#print (alleles[1], "Y-like")
+					XY_Y_like = alleles[1] + "/" + alleles[1]
+					XY_X_like = alleles[0] + "/" + alleles[0]
+					ZW_W_like = hom_maj
+					ZW_Z_like = hom_maj
+				elif freq_1_p2 == 1:
+					#print (alleles[0], "Y-like")
+					XY_Y_like = alleles[0] + "/" + alleles[0]
+					XY_X_like = alleles[1] + "/" + alleles[1] 
+					ZW_W_like = hom_maj
+					ZW_Z_like = hom_maj
+				else:
+					# not gametolog-like; therefore all categories get the major allele 
+					XY_X_like = hom_maj
+					ZW_W_like = hom_maj
+					XY_Y_like = hom_maj
+					ZW_Z_like = hom_maj
 
+			elif het_females == 1.0:
+				if freq_0_p1 == 1:
+					XY_Y_like = hom_maj
+					XY_X_like = hom_maj
+					ZW_W_like = alleles[1] + "/" + alleles[1]
+					ZW_Z_like = alleles[0] + "/" + alleles[0]
+				elif freq_1_p1 == 1:
+					XY_Y_like = hom_maj
+					XY_X_like = hom_maj
+					ZW_W_like = alleles[0] + "/" + alleles[0]
+					ZW_Z_like = alleles[1] + "/" + alleles[1]
+				else:
+					# not gametolog-like; therefore all categories get the major allele 
+					XY_X_like = hom_maj
+					ZW_W_like = hom_maj
+					XY_Y_like = hom_maj
+					ZW_Z_like = hom_maj
 
-# vcf_outfile.close()
-vcf_infile.close()
-m_vcf_freqs_file.close()
-f_vcf_freqs_file.close()
+			else:
+				# not gametolog-like; therefore all categories get the major allele
+				XY_X_like = hom_maj
+				ZW_W_like = hom_maj
+				XY_Y_like = hom_maj
+				ZW_Z_like = hom_maj
+					
+		sys.stdout.write( "\t".join([chrom, pos, ".", refallele, altallele, "60", ".", ".", "GT", XY_Y_like, XY_X_like, ZW_W_like, ZW_Z_like ]) + "\n" )
 

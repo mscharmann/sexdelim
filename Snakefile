@@ -442,25 +442,34 @@ rule pi_windowed:
 		"""
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.pi.txt
 		bedtools makewindows -w {windowsize} -g genomefile.pi.txt > windows.pi.bed
+
+		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
+		# same order as in the fasta genome file; its unclear how this can happen but it DOES
+		cut -f1 {input.pim} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > pi_sort_order_in_scores.txt
+		# find chroms NOT YET in the list
+		comm -13 <(cut -f1 pi_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.pi.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> pi_sort_order_in_scores.txt
+			 
+		bedtools sort -g pi_sort_order_in_scores.txt -i windows.pi.bed > windows.pi.sort_order_in_scores.bed
 		
 		# MALE
-		(bedtools map -a windows.pi.bed -b {input.pim} -g genomefile.pi.txt -c 4 -o mean > pi_num_M )& 
-		(bedtools map -a windows.pi.bed -b {input.pim} -g genomefile.pi.txt -c 5 -o mean > pi_denom_M )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pim} -c 4 -o mean > pi_num_M )& 
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pim} -c 5 -o mean > pi_denom_M )&
 
 		# FEMALE
-		(bedtools map -a windows.pi.bed -b {input.pif} -g genomefile.pi.txt -c 4 -o mean > pi_num_F )&
-		(bedtools map -a windows.pi.bed -b {input.pif} -g genomefile.pi.txt -c 5 -o mean > pi_denom_F )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pif} -c 4 -o mean > pi_num_F )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pif} -c 5 -o mean > pi_denom_F )&
 		
 		wait
 		
 		paste pi_num_M pi_denom_M > pi_both_M		
-		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_M > {output.pi_m_bed}
-
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_M > pi_tmp 			
+		bedtools sort -g genomefile.pi.txt -i pi_tmp > {output.pi_m_bed}
 
 		paste pi_num_F pi_denom_F > pi_both_F		
-		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_F > {output.pi_f_bed}
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_F > pi_tmp		
+		bedtools sort -g genomefile.pi.txt -i pi_tmp > {output.pi_f_bed}
 		
-		rm genomefile.pi.txt windows.pi.bed pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F
+		rm genomefile.pi.txt windows.pi.bed pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F pi_tmp windows.pi.sort_order_in_scores.bed pi_sort_order_in_scores.txt
 		"""
 
 rule dxy_rawstats:
@@ -486,16 +495,26 @@ rule dxy_windowed:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.dxy.txt
 		bedtools makewindows -w {windowsize} -g genomefile.dxy.txt > windows.dxy.bed
 		
+		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
+		# same order as in the fasta genome file; its unclear how this can happen but it DOES
+		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > dxy_sort_order_in_scores.txt
+		# find chroms NOT YET in the list
+		comm -13 <(cut -f1 dxy_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.dxy.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> dxy_sort_order_in_scores.txt
+
+		bedtools sort -g dxy_sort_order_in_scores.txt -i windows.dxy.bed > windows.dxy.sort_order_in_scores.bed
+
 		# correct
-		( bedtools map -a windows.dxy.bed -b {input.raw} -g genomefile.dxy.txt -c 4 -o mean > dxy_num )&
-		( bedtools map -a windows.dxy.bed -b {input.raw} -g genomefile.dxy.txt -c 5 -o mean > dxy_denom )&
+		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > dxy_num )&
+		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > dxy_denom )&
 		wait
-		
+
 		paste dxy_num dxy_denom > dxy_both
 		
-		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' dxy_both > {output}
+		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' dxy_both > dxy_tmp
+			
+		bedtools sort -g genomefile.dxy.txt -i dxy_tmp > {output}
 		
-		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both
+		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both dxy_tmp windows.dxy.sort_order_in_scores.bed dxy_sort_order_in_scores.txt
 		"""
 
 
@@ -758,20 +777,6 @@ rule match_kmers_to_genome:
 		rm windows.kmer.bed M_specific_kmer.sorted.bam M_specific_kmer.sorted.bam.bai F_specific_kmer.sorted.bam F_specific_kmer.sorted.bam.bai
 		"""
 	
-	
-rule calculate_freqs:
-	input:
-		popm={popmapfile},
-		gzvcf="results_raw/all.post_filter.vcf.gz"
-	output:
-		mfreq="results_raw/freq_males.txt.gz",
-		ffreq="results_raw/freq_females.txt.gz"
-	shell:
-		"""
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --freq --stdout | gzip > {output.mfreq}
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --freq --stdout | gzip > {output.ffreq}
-		"""
-
 rule calc_indiv_het:
 	input:
 		popm={popmapfile},
@@ -808,14 +813,13 @@ rule indiv_het_per_windows:
 	
 rule pseudo_phase_gametologs:
 	input:
-		mfreq="results_raw/freq_males.txt.gz",
-		ffreq="results_raw/freq_females.txt.gz",
-		gzvcf="results_raw/all.post_filter.vcf.gz"
+		gzvcf="results_raw/all.post_filter.vcf.gz",
+		popm={popmapfile}
 	output:
 		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	shell:
 		"""
-		python scripts/pseudo_phase_gametologs.py {input.mfreq} {input.ffreq} {input.gzvcf} | bgzip -c > {output}
+		python scripts/pseudo_phase_gametologs.py {input.popm} {input.gzvcf} | bgzip -c > {output}
 		"""
 	
 rule score_XY_gametolog_divergence:
