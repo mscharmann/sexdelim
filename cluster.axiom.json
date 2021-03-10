@@ -89,6 +89,13 @@
         "CPUs" : 1,
         "RAM_memory" : "2G",
         "partition" : "axiom"
+    },
+    "pseudo_phase_gametologs" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "axiom"
     }
 }
 
