@@ -868,15 +868,23 @@ rule XY_div_windows:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
 
-		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 4 -o mean > XY_dxy_num )&
-		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 5 -o mean > XY_dxy_denom )&
+		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
+		# same order as in the fasta genome file; its unclear how this can happen but it DOES
+		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > XYdiv_sort_order_in_scores.txt
+		# find chroms NOT YET in the list
+		comm -13 <(cut -f1 XYdiv_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.xygametologs.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> XYdiv_sort_order_in_scores.txt
+
+		bedtools sort -g XYdiv_sort_order_in_scores.txt -i windows.xygametologs.bed > windows.XYdiv.sort_order_in_scores.bed
+		
+		(bedtools map -a windows.XYdiv.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > XY_dxy_num )&
+		(bedtools map -a windows.XYdiv.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > XY_dxy_denom )&
 		wait
 		
 		paste XY_dxy_num XY_dxy_denom > XY_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' XY_dxy_both > {output}
 		
-		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both		
+		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both	XYdiv_sort_order_in_scores.txt windows.XYdiv.sort_order_in_scores.bed	
 		"""
 
 rule ZW_div_windows:
@@ -891,15 +899,23 @@ rule ZW_div_windows:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
 
-		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 4 -o mean > ZW_dxy_num )&
-		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 5 -o mean > ZW_dxy_denom )&
+		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
+		# same order as in the fasta genome file; its unclear how this can happen but it DOES
+		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > ZWdiv_sort_order_in_scores.txt
+		# find chroms NOT YET in the list
+		comm -13 <(cut -f1 ZWdiv_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.zwgametologs.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> ZWdiv_sort_order_in_scores.txt
+
+		bedtools sort -g ZWdiv_sort_order_in_scores.txt -i windows.zwgametologs.bed > windows.ZWdiv.sort_order_in_scores.bed
+
+		( bedtools map -a windows.ZWdiv.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > ZW_dxy_num )&
+		( bedtools map -a windows.ZWdiv.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > ZW_dxy_denom )&
 		wait
 				
 		paste ZW_dxy_num ZW_dxy_denom > ZW_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' ZW_dxy_both > {output}
 		
-		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both		
+		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both windows.ZWdiv.sort_order_in_scores.bed ZWdiv_sort_order_in_scores.txt 		
 		"""
 
 
