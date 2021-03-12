@@ -1,0 +1,11 @@
+popmapfile: "data/popmap.txt"
+windowsize: 1000
+genomefile: "data/fakegenome.MALE.fa"
+samples_reads_map: "data/samples_and_readfiles.txt"
+regions_for_plot_bed: "data/Ychrom.bed"
+
+VCF_MISS: 0.1
+VCF_QUAL: 20
+VCF_MIN_DEPTH: 6
+
+

@@ -1,9 +1,10 @@
-popmapfile = "data/popmap.txt"
-windowsize = 1000
-genomefile = "data/fakegenome.MALE.fa"
-samples_reads_map = "data/samples_and_readfiles.txt"
-regions_for_plot_bed = "data/Ychrom.bed"
+configfile: "config.yaml"
 
+popmapfile = config["popmapfile"]
+windowsize = int( config["windowsize"] )
+genomefile = config["genomefile"]
+samples_reads_map = config["samples_reads_map"]
+regions_for_plot_bed = config["regions_for_plot_bed"]
 
 
 def read_popmap(popmapfile):
@@ -291,9 +292,9 @@ rule VCF_filter_variants:
 	output:
 		"results_raw/variant_sites.vcf.gz"
 	params:
-		MISS=0.1,
-		QUAL=20,
-		MIN_DEPTH=6
+		MISS=config["VCF_MISS"],
+		QUAL=config["VCF_QUAL"],
+		MIN_DEPTH=config["VCF_MIN_DEPTH"]
 	shell:
 		"""
 		## https://bcbio.wordpress.com/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/#comment-1469
@@ -324,9 +325,9 @@ rule VCF_filter_invariants:
 	output:
 		"results_raw/invariant_sites.vcf.gz"
 	params:
-		MISS=0.1,
-		QUAL=20,
-		MIN_DEPTH=6
+		MISS=config["VCF_MISS"],
+		QUAL=config["VCF_QUAL"],
+		MIN_DEPTH=config["VCF_MIN_DEPTH"]
 	shell:
 		"""
 		## https://bcbio.wordpress.com/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/#comment-1469
@@ -811,7 +812,7 @@ rule indiv_het_per_windows:
 		rm genomefile.het.txt windows.het.bed		
 		"""
 	
-rule pseudo_phase_gametologs:
+rule on:
 	input:
 		gzvcf="results_raw/all.post_filter.vcf.gz",
 		popm={popmapfile}
@@ -868,23 +869,15 @@ rule XY_div_windows:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
 
-		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
-		# same order as in the fasta genome file; its unclear how this can happen but it DOES
-		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > XYdiv_sort_order_in_scores.txt
-		# find chroms NOT YET in the list
-		comm -13 <(cut -f1 XYdiv_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.xygametologs.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> XYdiv_sort_order_in_scores.txt
-
-		bedtools sort -g XYdiv_sort_order_in_scores.txt -i windows.xygametologs.bed > windows.XYdiv.sort_order_in_scores.bed
-		
-		(bedtools map -a windows.XYdiv.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > XY_dxy_num )&
-		(bedtools map -a windows.XYdiv.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > XY_dxy_denom )&
+		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 4 -o mean > XY_dxy_num )&
+		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 5 -o mean > XY_dxy_denom )&
 		wait
 		
 		paste XY_dxy_num XY_dxy_denom > XY_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' XY_dxy_both > {output}
 		
-		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both	XYdiv_sort_order_in_scores.txt windows.XYdiv.sort_order_in_scores.bed	
+		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both		
 		"""
 
 rule ZW_div_windows:
@@ -899,23 +892,15 @@ rule ZW_div_windows:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
 
-		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
-		# same order as in the fasta genome file; its unclear how this can happen but it DOES
-		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > ZWdiv_sort_order_in_scores.txt
-		# find chroms NOT YET in the list
-		comm -13 <(cut -f1 ZWdiv_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.zwgametologs.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> ZWdiv_sort_order_in_scores.txt
-
-		bedtools sort -g ZWdiv_sort_order_in_scores.txt -i windows.zwgametologs.bed > windows.ZWdiv.sort_order_in_scores.bed
-
-		( bedtools map -a windows.ZWdiv.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > ZW_dxy_num )&
-		( bedtools map -a windows.ZWdiv.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > ZW_dxy_denom )&
+		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 4 -o mean > ZW_dxy_num )&
+		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 5 -o mean > ZW_dxy_denom )&
 		wait
 				
 		paste ZW_dxy_num ZW_dxy_denom > ZW_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' ZW_dxy_both > {output}
 		
-		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both windows.ZWdiv.sort_order_in_scores.bed ZWdiv_sort_order_in_scores.txt 		
+		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both		
 		"""
 
 
