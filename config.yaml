@@ -8,4 +8,10 @@ VCF_MISS: 0.1
 VCF_QUAL: 20
 VCF_MIN_DEPTH: 6
 
+# freebayes shall skip regions of the genome with extremely high coverage
+# these aren't going to contain useful information but they can stall freebayes
+# set the threshold to 10 * N_samples * expected average coverage (= bases sequenced per sample / genomesize); e.g. 10*50*(20/0.444)
+freebayes_skip_cov: 22500
 
+# freebayes jobs will be split to run on chunks of the data with equal size.
+freebayes_chunksize: 1000000

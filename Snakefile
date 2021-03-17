@@ -163,7 +163,7 @@ checkpoint split_ref_for_freebayes:
 	output:
 		directory("FB_chunks")
 	params:
-		chunksize_Mb = 100000
+		chunksize_Mb = config["freebayes_chunksize"]
 	shell:
 		"""
 		samtools faidx {input.ref}
@@ -184,7 +184,7 @@ rule freebayes:
 	output:
 		"FB_chunk_VCFs/{i}.bed.vcf.gz"
 	params: 
-		skip_cov = 6750 # set this to 10 * N_samples * expected average coverage (= bases sequenced per sample / genomesize); e.g. 20*10*(15/0.444)
+		skip_cov = config["freebayes_skip_cov"] # set this to 10 * N_samples * expected average coverage (= bases sequenced per sample / genomesize); e.g. 20*10*(15/0.444)
 	shell:
 		"""
 		freebayes -L <( ls mapped_reads/*.bam ) -t {input.regions} -f {input.ref} --min-coverage 6 --min-mapping-quality 5 \

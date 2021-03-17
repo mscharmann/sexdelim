@@ -96,7 +96,15 @@
         "CPUs" : 1,
         "RAM_memory" : "2G",
         "partition" : "axiom"
+    },
+    "get_coverage_in_windows" :
+    {
+        "time" : "24:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "axiom"
     }
+
 }
 
 
