@@ -172,7 +172,7 @@ checkpoint split_ref_for_freebayes:
 		# wget https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc36616869930ec/raw/eff3032ca7c955ca33bffd8758092e4006949c75/split_ref_by_bai_datasize.py
 		python scripts/split_ref_by_bai_datasize.py -r {input.ref}.fai -L bamlistforsplit --target-data-size {params.chunksize_Mb} > FB_regionsALL.bed
 		rm bamlistforsplit
-		split --lines=1 FB_regionsALL.bed FB_regions_ --numeric-suffixes --suffix-length=4 --additional-suffix=.bed
+		split --lines=1 FB_regionsALL.bed FB_regions_ --numeric-suffixes --suffix-length=6 --additional-suffix=.bed
 		mkdir {output}
 		for i in FB_regions_* ; do mv $i {output} ; done		
 		"""
