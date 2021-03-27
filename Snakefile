@@ -241,7 +241,7 @@ rule merge_vcfs:
 		"""
 		# MUST NOT USE bcftools concat: it cannot resolve POS that are non-monotonically icreasing (which ca happen at the interval boundaries)
 		# the code below is only slightly modified from freebayes-parallel script: https://github.com/freebayes/freebayes/blob/master/scripts/freebayes-parallel
-		# zcat {input.region_vcfs} | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
+		# zcat input.region_vcfs | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		# zcat alone may complain about too many arguments, so better use find -exec :
 		find FB_chunk_VCFs/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		"""
@@ -787,8 +787,9 @@ rule calc_indiv_het:
 		fhet="results_raw/het_females.txt"
 	shell:
 		"""
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.mhet}
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.fhet}
+		# calculate heterozygosity for GLOBAL variants, i.e. M or F may be fixed for a variant but we calculate heterozygosity anyway.
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.mhet}
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.fhet}
 		"""
 
 rule indiv_het_per_windows:
