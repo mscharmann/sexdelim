@@ -225,17 +225,24 @@ rule freebayes:
 def merge_vcfs_input(wildcards):
 	checkpoint_output = checkpoints.split_ref_for_freebayes.get(**wildcards).output[0]
 	# print(checkpoint_output)
-	these_files = sorted( expand("FB_chunk_VCFs/{i}.bed.vcf.gz", i=glob_wildcards(os.path.join(checkpoint_output, "{i}.bed")).i) )
+	vcfs_before_filter = sorted( expand("FB_chunk_VCFs/{i}.bed.vcf.gz", i=glob_wildcards(os.path.join(checkpoint_output, "{i}.bed")).i) )
 	# print (thef)
-	return these_files
+	vcfs_after_filter = sorted( expand("FB_chunk_VCFs_filtered/{i}.bed.vcf.gz", i=glob_wildcards(os.path.join(checkpoint_output, "{i}.bed")).i) )
+	return vcfs_after_filter
+
            
+def VCF_get_mean_depth_per_site_input(wildcards):
+	checkpoint_output = checkpoints.split_ref_for_freebayes.get(**wildcards).output[0]
+	# print(checkpoint_output)
+	vcfs_before_filter = sorted( expand("FB_chunk_VCFs/{i}.bed.vcf.gz", i=glob_wildcards(os.path.join(checkpoint_output, "{i}.bed")).i) )
+	return vcfs_before_filter
            
 
-rule merge_vcfs:
+rule merge_filtered_vcfs:
 	input:
 		region_vcfs=merge_vcfs_input # refers to the function above which evaluates the checkpoint
 	output:
-		"results_raw/all.pre_filter.vcf.gz"
+		"results_raw/all.post_filter.vcf.gz"
 	threads: 3
 	shell:
 		"""
@@ -243,24 +250,26 @@ rule merge_vcfs:
 		# the code below is only slightly modified from freebayes-parallel script: https://github.com/freebayes/freebayes/blob/master/scripts/freebayes-parallel
 		# zcat input.region_vcfs | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		# zcat alone may complain about too many arguments, so better use find -exec :
-		find FB_chunk_VCFs/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
+		find FB_chunk_VCFs_filtered/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		"""
 
 
 rule VCF_get_mean_depth_per_site:
 	input:
-		"results_raw/all.pre_filter.vcf.gz"
+		region_vcfs=VCF_get_mean_depth_per_site_input # function which evaluates the same checkpoint as merge_filtered_vcfs
 	output:
 		"results_raw/meandepthpersite.txt"
-	threads: 2
+	threads: 16
 	shell:
-		"""
-		# index VCF
-		( tabix {input} )&
+		"""	
+		vcf_files=$(find FB_chunk_VCFs/*.bed.vcf.gz -type f)
 		
-		# get a subset of 10k to 100k of the raw VCF records; iteratively keeping only 10% of lines in file
-		( zcat {input} | cut -f1,2 > all_pos_in_vcf.txt 
+		parallel -j {threads} 'zcat {{}} | grep -v "#" | cut -f1,2 > {{}}.sites' ::: ${{vcf_files}}
 		
+		find FB_chunk_VCFs/*.bed.vcf.gz.sites -type f | xargs cat > all_pos_in_vcf.txt 
+		rm FB_chunk_VCFs/*.sites
+				
+		# get a subset of 10k to 100k of the raw VCF records; iteratively keeping only 10% of lines in file		
 		cp all_pos_in_vcf.txt tmp1
 		nlines=$( cat tmp1 | wc -l )
 		echo $nlines
@@ -270,27 +279,27 @@ rule VCF_get_mean_depth_per_site:
 		nlines=$( cat tmp1 | wc -l )
 		echo $nlines
 		done
-		)&
-		wait
-		
+				
 		grep -v "#" tmp1 > postokeep.txt
 	
-		# subset the VCF
-		tabix -h -R postokeep.txt {input} > subset.vcf
 		
-		# Calculate mean depth per site
-		vcftools --vcf subset.vcf --site-mean-depth --stdout | cut -f3 > {output}
+		#parallel -j {threads} 'tabix {{}} ; tabix -h -R postokeep.txt {{}} > {{}}.subset.vcf ; rm {{}}.tbi ; vcftools --vcf {{}}.subset.vcf --site-mean-depth --stdout | cut -f3 | tail -n +2 > {{}}.mdps ; rm {{}}.subset.vcf' ::: ${{vcf_files}}
 		
-		rm subset.vcf tmp1 all_pos_in_vcf.txt postokeep.txt 
+		parallel -j {threads} 'vcftools --gzvcf {{}} --positions postokeep.txt --site-mean-depth --stdout | cut -f3 | tail -n +2 > {{}}.mdps' ::: ${{vcf_files}}
+		
+		find FB_chunk_VCFs/*.mdps -type f | xargs cat > {output}
+		
+		rm postokeep.txt all_pos_in_vcf.txt tmp1 FB_chunk_VCFs/*.mdps
+		
 		"""
 
 	
-rule VCF_filter_variants:
+rule VCF_filter_variants_and_invariants:
 	input:
 		mdps="results_raw/meandepthpersite.txt",
-		gzvcf="results_raw/all.pre_filter.vcf.gz"
+		gzvcf="FB_chunk_VCFs/{i}.bed.vcf.gz"
 	output:
-		"results_raw/variant_sites.vcf.gz"
+		temp( "FB_chunk_VCFs_filtered/{i}.bed.vcf.gz" )
 	params:
 		MISS=config["VCF_MISS"],
 		QUAL=config["VCF_QUAL"],
@@ -314,53 +323,29 @@ rule VCF_filter_variants:
 
 		# variants:
 		vcftools --gzvcf {input.gzvcf} --mac 1 --minQ {params.QUAL} --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > {output}
-		tabix {output}
-		"""
-
-rule VCF_filter_invariants:
-	input:
-		mdps="results_raw/meandepthpersite.txt",
-		gzvcf="results_raw/all.pre_filter.vcf.gz"
-	output:
-		"results_raw/invariant_sites.vcf.gz"
-	params:
-		MISS=config["VCF_MISS"],
-		QUAL=config["VCF_QUAL"],
-		MIN_DEPTH=config["VCF_MIN_DEPTH"]
-	shell:
-		"""
-		## https://bcbio.wordpress.com/2013/10/21/updated-comparison-of-variant-detection-methods-ensemble-freebayes-and-minimal-bam-preparation-pipelines/#comment-1469
-		## => "We use ... a very vanilla filter with only depth and quality (QUAL < 20, DP < 5)"
-		## => impose a minimum of QUAL, and a minimum of DEPTH
-		## 	for variants, I want those two, AND a maximum DPETH cutoff 
-		## 	for invariants, we can only impose a minimum DEPTH and a maximum DEPTH.
-		## use code from dDocent to calcualte a mean depth histogram, then find the 95th percentile: no. too complicated; there are easier ways to do this.
-		## also good info:
-		## 	https://speciationgenomics.github.io/filtering_vcfs/
-
-		# set filters
-		# MAX_DEPTH is specific to the dataset; we take the 98th percentile of the mean depths per site:
-		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
-
-		echo $MAX_DEPTH
-
-		# variants:
+		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
+		
+		# invariants:
 		vcftools --gzvcf {input.gzvcf} --max-maf 0 --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > {output}		
-		tabix {output}
+		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
+		
+		# combine the two VCFs using bcftools concat
+		bcftools concat --allow-overlaps FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} -O z -o {output}
+		
+		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}*
+		
 		"""
 
-rule VCF_merge_post_filter:
+rule make_variant_only_VCF:
 	input:
-		invar="results_raw/invariant_sites.vcf.gz",
-		var="results_raw/variant_sites.vcf.gz"
-	output:
 		"results_raw/all.post_filter.vcf.gz"
+	output:
+		temp( "results_raw/variant_sites.vcf.gz" )
 	shell:
 		"""
-		# combine the two VCFs using bcftools concat
-		bcftools concat --allow-overlaps {input.var} {input.invar} -O z -o {output}
+		vcftools --gzvcf {input} --mac 1 --recode --stdout | bgzip -c > {output}
 		"""
 		
 rule get_coverage_in_windows:

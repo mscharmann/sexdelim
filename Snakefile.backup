@@ -64,7 +64,7 @@ rule all:
 		"results_processed/windows.multicov.M.txt",
 		"results_processed/M_F_norm_coverage_ratio_log2.bed.txt",
 		"results_processed/plink.assoc_results.significant.window.bed.txt",
-		"results_raw/plink.assoc_results.assoc.raw.txt",
+		"results_raw/plink.assoc_results.assoc.raw.txt.gz",
 		"results_processed/LD_r2_averaged_per_window.bed.txt",
 		"results_raw/F_specific_kmer.fa",
 		"results_raw/M_specific_kmer.fa",
@@ -409,11 +409,11 @@ rule pi_rawstats_M:
 		popmap={popmapfile},
 		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"results_raw/pi_raw.M.txt"		
+		"results_raw/pi_raw.M.txt.gz"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
+		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
 		rm mpop_pi
 		"""
 
@@ -422,18 +422,18 @@ rule pi_rawstats_F:
 		popmap={popmapfile},
 		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"results_raw/pi_raw.F.txt"		
+		"results_raw/pi_raw.F.txt.gz"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py > {output}
+		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
 		rm fpop_pi
 		"""
 
 rule pi_windowed:
 	input:
-		pim="results_raw/pi_raw.M.txt",
-		pif="results_raw/pi_raw.F.txt",
+		pim="results_raw/pi_raw.M.txt.gz",
+		pif="results_raw/pi_raw.F.txt.gz",
 		fa=genomefile
 	output:
 		pi_f_bed="results_processed/F.pi.bed.txt",
@@ -441,24 +441,29 @@ rule pi_windowed:
 	threads: 4
 	shell:
 		"""
+		# unzip raw
+		(gunzip -c {input.pim} > tmp.pi_raw.M.txt )&
+		(gunzip -c {input.pif} > tmp.pi_raw.F.txt )&
+		wait
+		
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.pi.txt
 		bedtools makewindows -w {windowsize} -g genomefile.pi.txt > windows.pi.bed
 
 		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
 		# same order as in the fasta genome file; its unclear how this can happen but it DOES
-		cut -f1 {input.pim} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > pi_sort_order_in_scores.txt
+		cut -f1 tmp.pi_raw.M.txt | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > pi_sort_order_in_scores.txt
 		# find chroms NOT YET in the list
 		comm -13 <(cut -f1 pi_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.pi.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> pi_sort_order_in_scores.txt
 			 
 		bedtools sort -g pi_sort_order_in_scores.txt -i windows.pi.bed > windows.pi.sort_order_in_scores.bed
 		
 		# MALE
-		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pim} -c 4 -o mean > pi_num_M )& 
-		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pim} -c 5 -o mean > pi_denom_M )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b tmp.pi_raw.M.txt -c 4 -o mean > pi_num_M )& 
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b tmp.pi_raw.M.txt -c 5 -o mean > pi_denom_M )&
 
 		# FEMALE
-		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pif} -c 4 -o mean > pi_num_F )&
-		(bedtools map -a windows.pi.sort_order_in_scores.bed -b {input.pif} -c 5 -o mean > pi_denom_F )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b tmp.pi_raw.F.txt -c 4 -o mean > pi_num_F )&
+		(bedtools map -a windows.pi.sort_order_in_scores.bed -b tmp.pi_raw.F.txt -c 5 -o mean > pi_denom_F )&
 		
 		wait
 		
@@ -470,7 +475,7 @@ rule pi_windowed:
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' pi_both_F > pi_tmp		
 		bedtools sort -g genomefile.pi.txt -i pi_tmp > {output.pi_f_bed}
 		
-		rm genomefile.pi.txt windows.pi.bed pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F pi_tmp windows.pi.sort_order_in_scores.bed pi_sort_order_in_scores.txt
+		rm genomefile.pi.txt windows.pi.bed pi_num_M pi_denom_M pi_num_F pi_denom_F pi_both_M pi_both_F pi_tmp windows.pi.sort_order_in_scores.bed pi_sort_order_in_scores.txt tmp.pi_raw.M.txt tmp.pi_raw.F.txt
 		"""
 
 rule dxy_rawstats:
@@ -478,35 +483,38 @@ rule dxy_rawstats:
 		popmap={popmapfile},
 		gzvcf="results_raw/all.post_filter.vcf.gz"
 	output:
-		"results_raw/dxy_raw.txt"		
+		"results_raw/dxy_raw.txt.gz"		
 	shell:
 		"""
-		zcat {input.gzvcf} | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} > {output}
+		zcat {input.gzvcf} | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} | gzip -c > {output}
 		"""
 
 rule dxy_windowed:
 	input:
-		raw="results_raw/dxy_raw.txt",
+		raw="results_raw/dxy_raw.txt.gz",
 		fa=genomefile
 	output:
 		"results_processed/MvF.dxy.bed.txt"
 	threads: 2
 	shell:
 		"""
+		# unzip raw file
+		gunzip -c {input.raw} > tmp.dxy_raw.txt
+		
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.dxy.txt
 		bedtools makewindows -w {windowsize} -g genomefile.dxy.txt > windows.dxy.bed
 		
 		# ugly construct to handle the "bug" that chromosomes in the VCF are not sorted in 
 		# same order as in the fasta genome file; its unclear how this can happen but it DOES
-		cut -f1 {input.raw} | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > dxy_sort_order_in_scores.txt
+		cut -f1 tmp.dxy_raw.txt | uniq | awk '{{print $1"\\t0\\t9999999999999999"}}' > dxy_sort_order_in_scores.txt
 		# find chroms NOT YET in the list
 		comm -13 <(cut -f1 dxy_sort_order_in_scores.txt | sort | uniq ) <(cut -f1 genomefile.dxy.txt | sort | uniq) | awk '{{print $1"\\t0\\t9999999999999999"}}' >> dxy_sort_order_in_scores.txt
 
 		bedtools sort -g dxy_sort_order_in_scores.txt -i windows.dxy.bed > windows.dxy.sort_order_in_scores.bed
 
 		# correct
-		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b {input.raw} -c 4 -o mean > dxy_num )&
-		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b {input.raw} -c 5 -o mean > dxy_denom )&
+		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b tmp.dxy_raw.txt -c 4 -o mean > dxy_num )&
+		( bedtools map -a windows.dxy.sort_order_in_scores.bed -b tmp.dxy_raw.txt -c 5 -o mean > dxy_denom )&
 		wait
 
 		paste dxy_num dxy_denom > dxy_both
@@ -515,7 +523,7 @@ rule dxy_windowed:
 			
 		bedtools sort -g genomefile.dxy.txt -i dxy_tmp > {output}
 		
-		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both dxy_tmp windows.dxy.sort_order_in_scores.bed dxy_sort_order_in_scores.txt
+		rm genomefile.dxy.txt windows.dxy.bed dxy_num dxy_denom dxy_both dxy_tmp windows.dxy.sort_order_in_scores.bed dxy_sort_order_in_scores.txt tmp.dxy_raw.txt
 		"""
 
 
@@ -548,30 +556,33 @@ rule fst_rawstats:
 		popmap={popmapfile},
 		gzvcf="results_raw/variant_sites.vcf.gz"
 	output:
-		"results_raw/fst_raw.txt"		
+		"results_raw/fst_raw.txt.gz"		
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_fst
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_fst
 
-		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}'> {output}
+		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}' | gzip -c > {output}
 		rm mpop_fst fpop_fst
 		"""
 
 rule fst_windowed:
 	input:
-		fraw="results_raw/fst_raw.txt",
+		fraw="results_raw/fst_raw.txt.gz",
 		fa=genomefile
 	output:
 		"results_processed/MvF.fst.bed.txt"
 	shell:
 		"""
+		# unzip raw
+		gunzip -c {input.fraw} > tmp.fst_raw.txt
+		
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.fst.txt
 		bedtools makewindows -w {windowsize} -g genomefile.fst.txt > windows.fst.bed
 		
-		bedtools map -a windows.fst.bed -b {input.fraw} -g genomefile.fst.txt -c 4 -o mean > {output}
+		bedtools map -a windows.fst.bed -b tmp.fst_raw.txt -g genomefile.fst.txt -c 4 -o mean > {output}
 		
-		rm genomefile.fst.txt windows.fst.bed		
+		rm genomefile.fst.txt windows.fst.bed tmp.fst_raw.txt		
 		"""
 
 	
@@ -581,7 +592,7 @@ rule GWAS_plink_raw:
 		gzvcf="results_raw/variant_sites.vcf.gz",
 		fa=genomefile
 	output:
-		"results_raw/plink.assoc_results.assoc.raw.txt"
+		"results_raw/plink.assoc_results.assoc.raw.txt.gz"
 	resources:
 		mem_mb=20000,
 		cpus=4
@@ -602,7 +613,7 @@ rule GWAS_plink_raw:
 		cat ../{input.popmap} | awk 'NF {{print $1"\\t"$1"\\t"$2}}' > thepheno
 		plink --vcf ../{input.gzvcf} --double-id --allow-extra-chr --pheno thepheno --allow-no-sex --assoc --out assoc_results	--threads {resources.cpus} --memory {resources.mem_mb} 
 		
-		mv assoc_results.assoc ../{output}
+		cat assoc_results.assoc | gzip -c > ../{output}
 		cd ../
 		rm -r tmpdir_plink_GWAS	
 		"""
@@ -611,12 +622,12 @@ rule GWAS_plink_raw:
 rule GWAS_plink_windows:
 	input:
 		fa=genomefile,
-		rawgwas="results_raw/plink.assoc_results.assoc.raw.txt"
+		rawgwas="results_raw/plink.assoc_results.assoc.raw.txt.gz"
 	output:
 		"results_processed/plink.assoc_results.significant.window.bed.txt",
 	shell:
 		"""
-		cat {input.rawgwas} | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
+		zcat {input.rawgwas} | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
 
 		cat plink.assoc_results.significant.txt | cut -f1,3,9 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
 
@@ -783,33 +794,39 @@ rule calc_indiv_het:
 		popm={popmapfile},
 		gzvcf="results_raw/variant_sites.vcf.gz"
 	output:
-		mhet="results_raw/het_males.txt",
-		fhet="results_raw/het_females.txt"
+		mhet="results_raw/het_males.txt.gz",
+		fhet="results_raw/het_females.txt.gz"
 	shell:
 		"""
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.mhet}
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --mac 1 --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5)}}' > {output.fhet}
+		# calculate heterozygosity for GLOBAL variants, i.e. M or F may be fixed for a variant but we calculate heterozygosity anyway.
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5); else print $1"\\t"$2"\\t"$2"\\tNA"}}' | gzip -c > {output.mhet}
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5); else print $1"\\t"$2"\\t"$2"\\tNA"}}' | gzip -c > {output.fhet}
 		"""
 
 rule indiv_het_per_windows:
 	input:
 		fa=genomefile,
-		mhet="results_raw/het_males.txt",
-		fhet="results_raw/het_females.txt"		
+		mhet="results_raw/het_males.txt.gz",
+		fhet="results_raw/het_females.txt.gz"		
 	output:
 		mhetwindows="results_processed/het_males.bed.txt",
 		fhetwindows="results_processed/het_females.bed.txt"
 	shell:
 		"""	
+		# unzip raw
+		(gunzip -c {input.mhet} > tmp.het_males.txt)&
+		(gunzip -c {input.fhet} > tmp.het_females.txt)&
+		wait
+		
 		# create windows, sort chroms lexicographically (same as the LD output)
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.het.txt
 		bedtools makewindows -w {windowsize} -g genomefile.het.txt > windows.het.bed
 
 		# get the mean HET per window
-		bedtools map -a windows.het.bed -b {input.mhet} -c 4 -o mean > {output.mhetwindows}
-		bedtools map -a windows.het.bed -b {input.fhet} -c 4 -o mean > {output.fhetwindows}
+		bedtools map -a windows.het.bed -b tmp.het_males.txt -c 4 -o mean > {output.mhetwindows}
+		bedtools map -a windows.het.bed -b tmp.het_females.txt -c 4 -o mean > {output.fhetwindows}
 		
-		rm genomefile.het.txt windows.het.bed		
+		rm genomefile.het.txt windows.het.bed tmp.het_males.txt tmp.het_females.txt		
 		"""
 	
 rule on:
@@ -827,7 +844,7 @@ rule score_XY_gametolog_divergence:
 	input:
 		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt"
+		"results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt.gz"
 	shell:
 		"""
 		echo -e "XY_Y_like\\tXY_Y_like" > xypopm
@@ -836,7 +853,7 @@ rule score_XY_gametolog_divergence:
 		echo -e "XY_X_like" > xypop
 		echo -e "XY_Y_like" >> xypop
 
-		vcftools --gzvcf {input} --keep xypop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm > {output}
+		vcftools --gzvcf {input} --keep xypop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm | gzip -c > {output}
 		rm xypopm xypop
 		"""
 
@@ -844,7 +861,7 @@ rule score_ZW_gametolog_divergence:
 	input:
 		"results_raw/gametolog_candidate_alleles.allsites.vcf.gz"
 	output:
-		"results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt"
+		"results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt.gz"
 	shell:
 		"""
 		echo -e "ZW_W_like\\tZW_W_like" > zwpopm
@@ -853,54 +870,60 @@ rule score_ZW_gametolog_divergence:
 		echo -e "ZW_W_like" > zwpop
 		echo -e "ZW_Z_like" >> zwpop
 
-		vcftools --gzvcf {input} --keep zwpop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm > {output}
+		vcftools --gzvcf {input} --keep zwpop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm | gzip -c > {output}
 		rm zwpopm zwpop
 		"""
 
 rule XY_div_windows:
 	input:
-		raw="results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt",
+		raw="results_raw/gametolog_candidate_alleles.XY_divergence.rawstats.txt.gz",
 		fa=genomefile
 	output:
 		"results_processed/gametolog_candidate_alleles.XY_divergence.windows.bed.txt"
 	threads: 2
 	shell:
 		"""
+		# unzip raw
+		gunzip -c {input.raw} > tmp.gametolog_candidate_alleles.XY_divergence.rawstats.txt
+		
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.xygametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.xygametologs.txt > windows.xygametologs.bed
 
-		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 4 -o mean > XY_dxy_num )&
-		(bedtools map -a windows.xygametologs.bed -b {input.raw} -g genomefile.xygametologs.txt -c 5 -o mean > XY_dxy_denom )&
+		(bedtools map -a windows.xygametologs.bed -b tmp.gametolog_candidate_alleles.XY_divergence.rawstats.txt -g genomefile.xygametologs.txt -c 4 -o mean > XY_dxy_num )&
+		(bedtools map -a windows.xygametologs.bed -b tmp.gametolog_candidate_alleles.XY_divergence.rawstats.txt -g genomefile.xygametologs.txt -c 5 -o mean > XY_dxy_denom )&
 		wait
 		
 		paste XY_dxy_num XY_dxy_denom > XY_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' XY_dxy_both > {output}
 		
-		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both		
+		rm genomefile.xygametologs.txt windows.xygametologs.bed XY_dxy_denom XY_dxy_num XY_dxy_both	tmp.gametolog_candidate_alleles.XY_divergence.rawstats.txt	
 		"""
 
 rule ZW_div_windows:
 	input:
-		raw="results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt",
+		raw="results_raw/gametolog_candidate_alleles.ZW_divergence.rawstats.txt.gz",
 		fa=genomefile
 	output:
 		"results_processed/gametolog_candidate_alleles.ZW_divergence.windows.bed.txt"
 	threads: 2
 	shell:
 		"""
+		# unzip raw
+		gunzip -c {input.raw} > tmp.gametolog_candidate_alleles.ZW_divergence.rawstats.txt
+
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.zwgametologs.txt
 		bedtools makewindows -w {windowsize} -g genomefile.zwgametologs.txt > windows.zwgametologs.bed
 
-		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 4 -o mean > ZW_dxy_num )&
-		( bedtools map -a windows.zwgametologs.bed -b {input.raw} -g genomefile.zwgametologs.txt -c 5 -o mean > ZW_dxy_denom )&
+		( bedtools map -a windows.zwgametologs.bed -b tmp.gametolog_candidate_alleles.ZW_divergence.rawstats.txt -g genomefile.zwgametologs.txt -c 4 -o mean > ZW_dxy_num )&
+		( bedtools map -a windows.zwgametologs.bed -b tmp.gametolog_candidate_alleles.ZW_divergence.rawstats.txt -g genomefile.zwgametologs.txt -c 5 -o mean > ZW_dxy_denom )&
 		wait
 				
 		paste ZW_dxy_num ZW_dxy_denom > ZW_dxy_both
 		
 		awk '{{ if($8>0) print $1"\\t"$2"\\t"$3"\\t"$4/$8 ; else print $1"\\t"$2"\\t"$3"\\tNA" }}' ZW_dxy_both > {output}
 		
-		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both		
+		rm genomefile.zwgametologs.txt windows.zwgametologs.bed ZW_dxy_denom ZW_dxy_num ZW_dxy_both	tmp.gametolog_candidate_alleles.ZW_divergence.rawstats.txt	
 		"""
 
 
