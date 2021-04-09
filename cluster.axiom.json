@@ -22,7 +22,7 @@
     },
     "merge_vcfs" :
     {
-        "time" : "12:00:00",
+        "time" : "48:00:00",
         "CPUs" : 1,
         "RAM_memory" : "20G",
         "partition" : "axiom"
@@ -36,7 +36,7 @@
     },
     "kmerGO" :
     {
-        "time" : "12:00:00",
+        "time" : "48:00:00",
         "CPUs" : 12,
         "RAM_memory" : "60G",
         "partition" : "axiom"
