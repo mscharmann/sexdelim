@@ -323,6 +323,7 @@ rule VCF_filter_variants_and_invariants:
 		echo $MAX_DEPTH
 		
 		wd=DIR_{wildcards.i}
+		mkdir FB_chunk_VCFs_filtered/$wd
 		
 		# variants:
 		vcftools --gzvcf {input.gzvcf} --mac 1 --minQ {params.QUAL} --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
@@ -350,7 +351,7 @@ rule VCF_filter_variants_and_invariants:
 		
 		# cleanup
 		rm -r $wd
-				
+		
 		"""
 
 rule make_variant_only_VCF:
