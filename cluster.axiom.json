@@ -27,11 +27,11 @@
         "RAM_memory" : "20G",
         "partition" : "axiom"
     },
-    "VCF_filter_invariants" :
+    "VCF_filter_variants_and_invariants" :
     {
-    	"time" : "12:00:00",
+    	"time" : "01:00:00",
         "CPUs" : 1,
-        "RAM_memory" : "5G",
+        "RAM_memory" : "1G",
         "partition" : "axiom"
     },
     "kmerGO" :
@@ -43,8 +43,8 @@
     },
 	"VCF_get_mean_depth_per_site" :
     {
-        "time" : "06:00:00",
-        "CPUs" : 1,
+        "time" : "04:00:00",
+        "CPUs" : 16,
         "RAM_memory" : "5G",
         "partition" : "axiom"
     },
