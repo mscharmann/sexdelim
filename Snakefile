@@ -350,7 +350,7 @@ rule VCF_filter_variants_and_invariants:
 		bcftools merge FB_chunk_VCFs_filtered/$wd/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/$wd/tmp.5.{wildcards.i} | bgzip -c > {output}
 		
 		# cleanup
-		rm -r $wd
+		rm -r FB_chunk_VCFs_filtered/$wd
 		
 		"""
 
