@@ -321,35 +321,36 @@ rule VCF_filter_variants_and_invariants:
 		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
 
 		echo $MAX_DEPTH
-
+		
+		wd=DIR_{wildcards.i}
+		
 		# variants:
 		vcftools --gzvcf {input.gzvcf} --mac 1 --minQ {params.QUAL} --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
-		tabix FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
+		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/$wd/tmp.1.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/$wd/tmp.1.{wildcards.i}
 		
 		# invariants:
 		vcftools --gzvcf {input.gzvcf} --max-maf 0 --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
-		tabix FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
+		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/$wd/tmp.2.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/$wd/tmp.2.{wildcards.i}
 		
 		# combine the two VCFs using bcftools concat, also remove several VCF TAGs which can cause errors later for bcftools merge, or are just not relevant anymore:
-		bcftools concat --allow-overlaps FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} | bcftools annotate -x FORMAT/AD | bcftools annotate -x FORMAT/AO | bcftools annotate -x FORMAT/QA | bcftools annotate -x FORMAT/GL | bcftools annotate -x FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > FB_chunk_VCFs_filtered/tmp.3.{wildcards.i}
+		bcftools concat --allow-overlaps FB_chunk_VCFs_filtered/$wd/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/$wd/tmp.2.{wildcards.i} | bcftools annotate -x FORMAT/AD | bcftools annotate -x FORMAT/AO | bcftools annotate -x FORMAT/QA | bcftools annotate -x FORMAT/GL | bcftools annotate -x FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > FB_chunk_VCFs_filtered/$wd/tmp.3.{wildcards.i}
 
 		# split by M and F populations, then filter for missingness in each pop. Thus we get sites that fulfill "MISS" in at least one of either M or F populations.
-		cat {input.popmap} | awk '{{if($2==2) print $1}}' > FB_chunk_VCFs_filtered/fpop.{wildcards.i}
-		cat {input.popmap} | awk '{{if($2==1) print $1}}' > FB_chunk_VCFs_filtered/mpop.{wildcards.i}
-		vcftools --gzvcf FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/fpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}
-		vcftools --gzvcf FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/mpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}
-		tabix FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}
-		tabix FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}
+		cat {input.popmap} | awk '{{if($2==2) print $1}}' > FB_chunk_VCFs_filtered/$wd/fpop.{wildcards.i}
+		cat {input.popmap} | awk '{{if($2==1) print $1}}' > FB_chunk_VCFs_filtered/$wd/mpop.{wildcards.i}
+		vcftools --gzvcf FB_chunk_VCFs_filtered/$wd/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/$wd/fpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/$wd/tmp.4.{wildcards.i}
+		vcftools --gzvcf FB_chunk_VCFs_filtered/$wd/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/$wd/mpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/$wd/tmp.5.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/$wd/tmp.4.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/$wd/tmp.5.{wildcards.i}
 
 		# merge M and F files again.
-		bcftools merge FB_chunk_VCFs_filtered/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/tmp.5.{wildcards.i} | bgzip -c > {output}
+		bcftools merge FB_chunk_VCFs_filtered/$wd/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/$wd/tmp.5.{wildcards.i} | bgzip -c > {output}
 		
 		# cleanup
-		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} FB_chunk_VCFs_filtered/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/tmp.5.{wildcards.i} FB_chunk_VCFs_filtered/fpop.{wildcards.i} FB_chunk_VCFs_filtered/mpop.{wildcards.i}
-		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}.tbi
-		
+		rm -r $wd
+				
 		"""
 
 rule make_variant_only_VCF:
