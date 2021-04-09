@@ -347,7 +347,8 @@ rule VCF_filter_variants_and_invariants:
 		bcftools merge FB_chunk_VCFs_filtered/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/tmp.5.{wildcards.i} | bgzip -c > {output}
 		
 		# cleanup
-		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.3.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}* FB_chunk_VCFs_filtered/fpop.{wildcards.i} FB_chunk_VCFs_filtered/mpop.{wildcards.i}
+		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} FB_chunk_VCFs_filtered/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/tmp.5.{wildcards.i} FB_chunk_VCFs_filtered/fpop.{wildcards.i} FB_chunk_VCFs_filtered/mpop.{wildcards.i}
+		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}.tbi FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}.tbi
 		
 		"""
 
