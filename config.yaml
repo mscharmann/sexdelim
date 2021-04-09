@@ -4,7 +4,8 @@ genomefile: "data/fakegenome.MALE.fa"
 samples_reads_map: "data/samples_and_readfiles.txt"
 regions_for_plot_bed: "data/Ychrom.bed"
 
-VCF_MISS: 0.1
+# VCF_MISS: VCFTOOLS --max-missing argument. 1 = only fully present sites pass, 0.9 = at most 10% of samples are missing. Applied separately to M and F populations, not globally.
+VCF_MISS: 0.75
 VCF_QUAL: 20
 VCF_MIN_DEPTH: 6
 
