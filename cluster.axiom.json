@@ -29,7 +29,7 @@
     },
     "VCF_filter_variants_and_invariants" :
     {
-    	"time" : "01:00:00",
+    	"time" : "00:30:00",
         "CPUs" : 1,
         "RAM_memory" : "1G",
         "partition" : "axiom"
