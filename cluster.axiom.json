@@ -20,7 +20,7 @@
         "RAM_memory" : "2G",
         "partition" : "axiom"
     },
-    "merge_vcfs" :
+    "merge_filtered_vcfs" :
     {
         "time" : "48:00:00",
         "CPUs" : 1,

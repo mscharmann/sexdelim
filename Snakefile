@@ -297,7 +297,8 @@ rule VCF_get_mean_depth_per_site:
 rule VCF_filter_variants_and_invariants:
 	input:
 		mdps="results_raw/meandepthpersite.txt",
-		gzvcf="FB_chunk_VCFs/{i}.bed.vcf.gz"
+		gzvcf="FB_chunk_VCFs/{i}.bed.vcf.gz",
+		popmap={popmapfile}
 	output:
 		temp( "FB_chunk_VCFs_filtered/{i}.bed.vcf.gz" )
 	params:
@@ -323,18 +324,30 @@ rule VCF_filter_variants_and_invariants:
 
 		# variants:
 		vcftools --gzvcf {input.gzvcf} --mac 1 --minQ {params.QUAL} --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
+		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
 		tabix FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}
 		
 		# invariants:
 		vcftools --gzvcf {input.gzvcf} --max-maf 0 --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
-		--max-meanDP $MAX_DEPTH --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
+		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
 		tabix FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}
 		
-		# combine the two VCFs using bcftools concat
-		bcftools concat --allow-overlaps FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} -O z -o {output}
+		# combine the two VCFs using bcftools concat, also remove several VCF TAGs which can cause errors later for bcftools merge, or are just not relevant anymore:
+		bcftools concat --allow-overlaps FB_chunk_VCFs_filtered/tmp.1.{wildcards.i} FB_chunk_VCFs_filtered/tmp.2.{wildcards.i} | bcftools annotate -x FORMAT/AD | bcftools annotate -x FORMAT/AO | bcftools annotate -x FORMAT/QA | bcftools annotate -x FORMAT/GL | bcftools annotate -x FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > FB_chunk_VCFs_filtered/tmp.3.{wildcards.i}
+
+		# split by M and F populations, then filter for missingness in each pop. Thus we get sites that fulfill "MISS" in at least one of either M or F populations.
+		cat {input.popmap} | awk '{{if($2==2) print $1}}' > FB_chunk_VCFs_filtered/fpop.{wildcards.i}
+		cat {input.popmap} | awk '{{if($2==1) print $1}}' > FB_chunk_VCFs_filtered/mpop.{wildcards.i}
+		vcftools --gzvcf FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/fpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}
+		vcftools --gzvcf FB_chunk_VCFs_filtered/tmp.3.{wildcards.i} --keep FB_chunk_VCFs_filtered/mpop.{wildcards.i} --max-missing {params.MISS} --recode --stdout | bgzip -c > FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}
+		tabix FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}
+
+		# merge M and F files again.
+		bcftools merge FB_chunk_VCFs_filtered/tmp.4.{wildcards.i} FB_chunk_VCFs_filtered/tmp.5.{wildcards.i} | bgzip -c > {output}
 		
-		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}*
+		# cleanup
+		rm FB_chunk_VCFs_filtered/tmp.1.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.2.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.3.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.4.{wildcards.i}* FB_chunk_VCFs_filtered/tmp.5.{wildcards.i}* FB_chunk_VCFs_filtered/fpop.{wildcards.i} FB_chunk_VCFs_filtered/mpop.{wildcards.i}
 		
 		"""
 
