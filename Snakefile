@@ -315,17 +315,18 @@ rule VCF_filter_variants_and_invariants:
 		## use code from dDocent to calcualte a mean depth histogram, then find the 95th percentile: no. too complicated; there are easier ways to do this.
 		## also good info:
 		## 	https://speciationgenomics.github.io/filtering_vcfs/
-
-		# set filters
-		# MAX_DEPTH is specific to the dataset; we take the 98th percentile of the mean depths per site:
-		MAX_DEPTH=$( sort -n {input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
-
-		echo $MAX_DEPTH
 		
+		# prepare
 		wd=DIR_{wildcards.i}
 		mkdir FB_chunk_VCFs_filtered/$wd
 		cd FB_chunk_VCFs_filtered/$wd
 		
+		# set filters
+		# MAX_DEPTH is specific to the dataset; we take the 98th percentile of the mean depths per site:
+		MAX_DEPTH=$( sort --temporary-directory=./ -n ../../{input.mdps} | awk 'BEGIN{{c=0}} length($0){{a[c]=$0;c++}}END{{p2=(c/100*2); p2=p2%1?int(p2)+1:p2; print a[c-p2-1]}}' )
+
+		echo $MAX_DEPTH
+				
 		# variants:
 		vcftools --gzvcf ../../{input.gzvcf} --mac 1 --minQ {params.QUAL} --min-meanDP {params.MIN_DEPTH} --minDP {params.MIN_DEPTH} \
 		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > tmp.1
