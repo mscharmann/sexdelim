@@ -338,7 +338,7 @@ rule VCF_filter_variants_and_invariants:
 		tabix tmp.2
 		
 		# combine the two VCFs using bcftools concat, also remove several VCF TAGs which can cause errors later for bcftools merge, or are just not relevant anymore:
-		bcftools concat --allow-overlaps tmp.1 tmp.2 | bcftools annotate -x FORMAT/AD | bcftools annotate -x FORMAT/AO | bcftools annotate -x FORMAT/QA | bcftools annotate -x FORMAT/GL | bcftools annotate -x FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > tmp.3
+		bcftools concat --allow-overlaps tmp.1 tmp.2 | bcftools annotate --remove FORMAT/AD,FORMAT/AO,FORMAT/QA,FORMAT/GL,FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > tmp.3
 
 		# split by M and F populations, then filter for missingness in each pop. Thus we get sites that fulfill "MISS" in at least one of either M or F populations.
 		cat ../../{input.popmap} | awk '{{if($2==2) print $1}}' > fpop
