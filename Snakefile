@@ -565,8 +565,9 @@ rule fst_rawstats:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_fst
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_fst
-
-		vcftools --gzvcf {input.gzvcf} --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}' | gzip -c > {output}
+				
+		# exclude singletons..https://www.biostars.org/p/278646/
+		vcftools --gzvcf {input.gzvcf} --mac 2 --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}' | gzip -c > {output}
 		rm mpop_fst fpop_fst
 		"""
 
@@ -578,6 +579,9 @@ rule fst_windowed:
 		"results_processed/MvF.fst.bed.txt"
 	shell:
 		"""
+		## we get an "average of ratios" rather than the "ratio of averages"..
+		## https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3759727/
+		
 		# unzip raw
 		gunzip -c {input.fraw} > tmp.fst_raw.txt
 		
@@ -751,6 +755,16 @@ rule kmerGO:
 		rm -r kmer_features kmer_matrix read_files kmer_countings traits_sex_for_kmerGO.txt
 		mv contig_result/F_specific_kmer.fa {output.fkmer}
 		mv contig_result/M_specific_kmer.fa {output.mkmer}
+		
+		# if contig_result files not created by kmerGO, then make a dummy file in order to finish the job successfully.
+		if [ ! -f contig_result/F_specific.fa.cap.contigs ]
+		then
+			touch contig_result/F_specific.fa.cap.contigs
+		fi
+		if [ ! -f contig_result/M_specific.fa.cap.contigs ]
+		then
+			touch contig_result/M_specific.fa.cap.contigs
+		fi		
 		mv contig_result/F_specific.fa.cap.contigs {output.fcont}
 		mv contig_result/M_specific.fa.cap.contigs {output.mcont}
 		rm -r contig_result
