@@ -567,7 +567,8 @@ rule fst_rawstats:
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_fst
 				
 		# exclude singletons..https://www.biostars.org/p/278646/
-		vcftools --gzvcf {input.gzvcf} --mac 2 --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}' | gzip -c > {output}
+		# also drop any "-nan" outputs immediately
+		vcftools --gzvcf {input.gzvcf} --mac 2 --weir-fst-pop mpop_fst --weir-fst-pop fpop_fst --stdout | awk '{{print $1"\\t"$2"\\t"$2"\\t"$3}}' | awk '{{if ( !($4=="-nan") ) print}}' | gzip -c > {output}
 		rm mpop_fst fpop_fst
 		"""
 
@@ -817,8 +818,9 @@ rule calc_indiv_het:
 	shell:
 		"""
 		# calculate heterozygosity for GLOBAL variants, i.e. M or F may be fixed for a variant but we calculate heterozygosity anyway.
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5); else print $1"\\t"$2"\\t"$2"\\tNA"}}' | gzip -c > {output.mhet}
-		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5); else print $1"\\t"$2"\\t"$2"\\tNA"}}' | gzip -c > {output.fhet}
+		# do not report het for sites where no genotypes are present.
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==1) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5) }}' | gzip -c > {output.mhet}
+		vcftools --gzvcf {input.gzvcf} --keep <( cat {input.popm} | awk '{{if($2==2) print $1}}' ) --hardy --stdout | awk -F'[\\t/]' 'NR>1 {{if(($3+$4+$5)>0) print $1"\\t"$2"\\t"$2"\\t"$4/($3+$4+$5) }}' | gzip -c > {output.fhet}
 		"""
 
 rule indiv_het_per_windows:
