@@ -636,15 +636,18 @@ rule GWAS_plink_windows:
 		"results_processed/plink.assoc_results.significant.window.bed.txt",
 	shell:
 		"""
-		zcat {input.rawgwas} | tr -s " " "\\t" | awk '{{if($9 <= 0.05) print}}' > plink.assoc_results.significant.txt
-
-		cat plink.assoc_results.significant.txt | cut -f1,3,9 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
+		zcat {input.rawgwas} | tr -s " " "\\t" > plink.assoc_results.raw.txt
+		
+		# Benjamini-Hochberg FDR procedure
+		bash scripts/PtoFDR.sh plink.assoc_results.raw.txt 9 > assoc.fdr.txt
+		cat assoc.fdr.txt | awk '{{if($9!="NA") print }}' | awk '{{if($10<=0.1) print}}' | grep -v "CHISQ" > fdr10perc.txt
+		cat fdr10perc.txt | cut -f1,3,10 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
 
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
 		bedtools makewindows -w {windowsize} -g genomefile.assoc.txt > windows.assoc.bed
 		bedtools coverage -counts -a windows.assoc.bed -b plink.assoc_results.significant.bed > {output}
 
-		rm plink.assoc_results.significant.txt plink.assoc_results.significant.bed genomefile.assoc.txt windows.assoc.bed 
+		rm plink.assoc_results.raw.txt assoc.fdr.txt fdr10perc.txt plink.assoc_results.significant.bed genomefile.assoc.txt windows.assoc.bed		 
 		"""
 
 rule LD_plink_raw:
