@@ -676,7 +676,7 @@ rule LD_plink_raw:
 
 		# apply a MAF filter 0.2 before calculating LD as rare alleles imply very high LD by definition; they are thus useless for our purpose.
 		# also, thin variants to at least 1000 bp distance; (this in combination with ld-window 500 resulted in best "LD island" visibility in Leucadendron rubrum data)
-		vcftools --gzvcf {input.gzvcf} --thin 1000 --maf 0.2 --recode --stdout | bgzip -c > forplinkld.vcf.gz
+		vcftools --gzvcf ../{input.gzvcf} --thin 1000 --maf 0.2 --recode --stdout | bgzip -c > forplinkld.vcf.gz
 		# vcftools --gzvcf {input.gzvcf} --maf 0.1 --recode --stdout > forplinkld.vcf
 		# plink --vcf forplinkld.vcf --double-id --allow-extra-chr --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 
 		# rm forplinkld.vcf 
