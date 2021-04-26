@@ -674,18 +674,23 @@ rule LD_plink_raw:
 		mkdir tmpdir_plink_LD
 		cd tmpdir_plink_LD
 
-		# apply a moderate MAF filter before calculating LD as rare alleles imply very high LD by definition; they are thus useless for our purpose.
+		# apply a MAF filter 0.2 before calculating LD as rare alleles imply very high LD by definition; they are thus useless for our purpose.
+		# also, thin variants to at least 1000 bp distance; (this in combination with ld-window 500 resulted in best "LD island" visibility in Leucadendron rubrum data)
+		vcftools --gzvcf {input.gzvcf} --thin 1000 --maf 0.2 --recode --stdout | bgzip -c > forplinkld.vcf.gz
 		# vcftools --gzvcf {input.gzvcf} --maf 0.1 --recode --stdout > forplinkld.vcf
 		# plink --vcf forplinkld.vcf --double-id --allow-extra-chr --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 
 		# rm forplinkld.vcf 
 		
-		plink --vcf ../{input.gzvcf} --double-id --allow-extra-chr --maf 0.1 --r2 --ld-window-r2 0.0 --ld-window 5 --ld-window-kb 2 --threads {resources.cpus} --memory {resources.mem_mb} 
+		plink --vcf forplinkld.vcf.gz --double-id --allow-extra-chr --maf 0.2 --r2 --ld-window-r2 0.0 --ld-window 500 --threads {resources.cpus} --memory {resources.mem_mb} 
 		
 		# --ld-window X	compute LD only for pairs that are at most X SNPs apart (default 10)
 		# --ld-window-kb X	compute LD only for pairs that are at most X kb apart (default 1000 kb)
 		# --ld-window-r2 X	minimum r2 to report, else omit from output. Default = 0.2
 
-		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > ../{output}
+		#cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > ../{output}
+		# interpolate the position of the LD value as the midpoint between the two variants from which it is calculated.
+		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | awk '{if($1==$3) print $1"\\t"int( ($2+$4)/2 )"\\t"int( ($2+$4)/2 )"\\t"$5 }' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > results_raw/ld_clean.sorted.bed.gz
+		
 		cd ../
 		rm -r tmpdir_plink_LD
 		"""
