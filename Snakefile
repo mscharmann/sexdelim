@@ -646,7 +646,7 @@ rule GWAS_plink_windows:
 		
 		# Benjamini-Hochberg FDR procedure
 		bash scripts/PtoFDR.sh plink.assoc_results.raw.txt 9 > assoc.fdr.txt
-		cat assoc.fdr.txt | awk '{{if($9!="NA") print }}' | awk '{{if($10<=0.1) print}}' | grep -v "CHISQ" > fdr10perc.txt
+		cat assoc.fdr.txt | grep -v "CHISQ" | awk '{{if($9!="NA") print }}' | awk '{{if($10<=0.1) print}}' > fdr10perc.txt
 		cat fdr10perc.txt | cut -f1,3,10 | awk '{{print $1"\\t"$2"\\t"$2}}' > plink.assoc_results.significant.bed
 
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.assoc.txt
