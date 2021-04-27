@@ -589,7 +589,13 @@ rule fst_windowed:
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.fst.txt
 		bedtools makewindows -w {windowsize} -g genomefile.fst.txt > windows.fst.bed
 		
-		bedtools map -a windows.fst.bed -b tmp.fst_raw.txt -g genomefile.fst.txt -c 4 -o mean > {output}
+		fstlines=$(cat tmp.fst_raw.txt | wc -l)
+		if [ "$fstlines" -gt 2 ]; then
+			bedtools map -a windows.fst.bed -b tmp.fst_raw.txt -g genomefile.fst.txt -c 4 -o mean > {output}
+		else
+			# fst file was empty, because all values in genome were NA. Make an NA windowed-file to allow downstream to proceed anyway.
+			cat windows.fst.bed | awk '{print $0"\tNA"}' > {output}
+		fi
 		
 		rm genomefile.fst.txt windows.fst.bed tmp.fst_raw.txt		
 		"""
