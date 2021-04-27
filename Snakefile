@@ -594,7 +594,7 @@ rule fst_windowed:
 			bedtools map -a windows.fst.bed -b tmp.fst_raw.txt -g genomefile.fst.txt -c 4 -o mean > {output}
 		else
 			# fst file was empty, because all values in genome were NA. Make an NA windowed-file to allow downstream to proceed anyway.
-			cat windows.fst.bed | awk '{print $0"\tNA"}' > {output}
+			cat windows.fst.bed | awk '{{print $0"\\tNA"}}' > {output}
 		fi
 		
 		rm genomefile.fst.txt windows.fst.bed tmp.fst_raw.txt		
