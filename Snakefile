@@ -768,8 +768,21 @@ rule kmerGO:
 		# -ci 	/ 	No minimal K-mer occurring times (default: 2)
 		scripts/KmerGO_for_linux_x64_cmd/KmerGO -n {threads} -k 16 -ci 3 -i read_files -t traits_sex_for_kmerGO.txt -p 0.01 -assl 0.8 -assn 0.8
 		rm -r kmer_features kmer_matrix read_files kmer_countings traits_sex_for_kmerGO.txt
-		mv contig_result/F_specific_kmer.fa {output.fkmer}
-		mv contig_result/M_specific_kmer.fa {output.mkmer}
+		
+		# if kmer result files not created by kmerGO (e.g. because there were no f-spec kmers), then make a dummy file in order to finish the job successfully.
+		if [ ! -f contig_result/F_specific_kmer.fa ]
+		then
+			touch {output.fkmer}
+		else
+			mv contig_result/F_specific_kmer.fa {output.fkmer}
+		fi
+		
+		if [ ! -f contig_result/M_specific_kmer.fa ]
+		then
+			touch {output.mkmer}
+		else
+			mv contig_result/M_specific_kmer.fa {output.mkmer}
+		fi
 		
 		# if contig_result files not created by kmerGO, then make a dummy file in order to finish the job successfully.
 		if [ ! -f contig_result/F_specific.fa.cap.contigs ]
