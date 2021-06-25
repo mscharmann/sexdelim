@@ -48,15 +48,6 @@ conda install -c conda-forge r-ggplot2 r-cowplot -y
 ```
 conda env create --file delimit_sexregions.2021-02-16.yml
 ```
-### fix small bug in pixy:
-nano $(which pixy)
-
-"OK so it helps to just paste this into the pixy executable script in the conda path:"
-
-import os
-
-os.environ["NUMEXPR_MAX_THREADS"]="272"
-
 
 ### get kmerGO
 ```
