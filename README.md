@@ -66,6 +66,7 @@ cd scripts
 unzip KmerGO_for_linux_x64_cmd.zip
 rm KmerGO_for_linux_x64_cmd.zip
 cd KmerGO_for_linux_x64_cmd
+mv KmerGO_for_cmd KmerGO
 chmod +x KmerGO
 chmod +x bin/kmc
 chmod +x bin/kmc_tools
