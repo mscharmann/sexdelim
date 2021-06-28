@@ -2,29 +2,38 @@
 
 a pipeline to delimit sex-linked regions in chromosome-scale genome assemblies, using re-sequencing data of males and females
 
-starting from a genome .fasta and fastq reads, generates 11 statistics in windows along the genome:
-
-- count of alignments for male-specific kmers (16-mers), aligned with 1 mismatch
-
-- count of alignments for female-specific kmers (16-mers), aligned with 1 mismatch
+starting from a genome .fasta and fastq reads, generates 15 statistics in windows along the genome:
 
 - log2 ratio of total normalised male over total normalised female read depth
 
-- GWAS / count of significantly sex-associated variants
+- count of alignments for female-specific kmers (16-mers), aligned with 1 mismatch
 
-- average linkage disequilibrium (LD, r2) in the whole population of males and females
-
-- nucleotide diversity pi in the males
+- count of alignments for male-specific kmers (16-mers), aligned with 1 mismatch
 
 - nucleotide diversity pi in the females
 
-- absolute sequence divergence (dxy) between males and females
+- nucleotide diversity pi in the males
 
 - Fst between males and females
 
-- sequence divergence (%) between X-like and Y-like "phased" candidate gametologs
+- absolute sequence divergence (dxy) between males and females
+
+- average linkage disequilibrium (LD, r2) in the whole population of males and females
+
+- GWAS / count of significantly sex-associated variants
+
+- heterozygosity in males
+
+- heterozygosity in females
 
 - sequence divergence (%) between Z-like and W-like "phased" candidate gametologs
+
+- sequence divergence (%) between X-like and Y-like "phased" candidate gametologs
+
+- net divergence of the sexes = absolute sequence divergence (dxy) - pi in the females
+
+- net divergence of the sexes = absolute sequence divergence (dxy) - pi in the males
+
 
 ## installation
 
