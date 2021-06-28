@@ -78,8 +78,8 @@ This file should be mostly self-explanatory and also contains some comments. Fur
 - popmap = 2-column tab-sep file listing samples with assignment as 1 (M) or 2 (F)
 - samples_reads_map = a table listing the samples and "mapping" to their corresponding fastq files. Both single and paired-end data can be handled, also mixed. CAUTION: currently, each sample may have at most one file (one pair of read files). If the reads are split into several files (pairs of files), these must be concatenated before start.
 - genome fasta file path
-- regions_for_plot_bed: a BED file with a region of special interest, e.g. the sex chromosome. The pipeline produces statistics for all genomic windows and then extracts a subset (region). Plots will be made for all genomic windows, and for the subset region. This can be useful if the assembly contains many contigs that would make for a messy plot.  
-- windowsize = length of intervals (windows) in which to split all statistics and plots. Most useful values are between 1000 and 100000. For another window size, 
+- regions_for_plot_bed: a BED file with a region of special interest, e.g. the sex chromosome. The pipeline produces statistics for all genomic windows and then extracts a subset (region). Plots will be made for all genomic windows, and for the subset region. This can be useful if the assembly contains many contigs that would make a messy plot.  
+- windowsize = length of intervals (windows) in which to split all statistics and plots. Most useful values are between 1000 and 100000.
 - VCF_MIN_DEPTH: the default here is 6 (retain all genotypes with at least 6 reads covering the site). I would reduce to as low as 3, but not less.	
 
 
@@ -98,8 +98,16 @@ snakemake -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster
 ## post-run
 - Inspect the PDF files and .txt tables with statistics in the directory results_processed.
 - results_processed are specific for the given windowsize. If a different windowsize is desired, intermediate results in the directory results_raw can be used to generate these relatively quickly, without going back to the read data and variant-calling. Just move the directory results_raw, change the windowsize in config.yaml, and start the pipeline again exactly as before. I usually do this several times for window sizes 1 kb, 10 kb, 25 kb, 50 kb, 100 kb.
-- If a different subset region for plotting is desired, there is no need to run the pipeline again. Just do: ```laber```
-- cleaning up / archiving: Once the final stats for all desired windowsizes are produced, it makes sense to clean up large intermediate files. I suggest to keep only the config.yaml, the popmap and samples_reads_map, the results_processed, or if you have a bit of space, also results_raw. I would delete the large .BAM files and intermediate VCF files; in the worst case these can be re-calculated. To clean up in this way, run ```rm -r alala```
+- If a different subset region for plotting is desired, there is no need to run the pipeline again, just subset the file calls/allstats.txt and call scripts/plot_allstats.R. For example, to plot only assembly sequences larger than 5 Gbp: 
+```seqtk comp data/genome_assembly.fa | awk '{{if($2>5000000) print $1"\t0\t"$2}}' > bigchroms.bed
+
+bedtools intersect -wa -a calls/allstats.txt -b bigchroms.bed > subs.txt
+
+Rscript scripts/plot_allstats.R subs.txt bigchroms.pdf
+```
+- cleaning up / archiving: Once the final stats for all desired windowsizes are produced, it makes sense to clean up large intermediate files. I suggest to keep only the config.yaml, the popmap and samples_reads_map, the results_processed, or if you have a bit of space, also results_raw. I would delete the large .BAM files and intermediate VCF files; in the worst case these can be re-calculated. To clean up in this way, run 
+```rm -rf mapped_reads FB_chunks FB_chunk_VCFs FB_chunk_VCFs_filtered FB_regionsALL.bed normalization_coefficients.txt```
+- I would also get rid of the hidden .snakemake directory, unless you really need it. It can be quite large/numerous tiny files.
 
 
 
