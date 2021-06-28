@@ -98,15 +98,18 @@ snakemake -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster
 ## post-run
 - Inspect the PDF files and .txt tables with statistics in the directory results_processed.
 - results_processed are specific for the given windowsize. If a different windowsize is desired, intermediate results in the directory results_raw can be used to generate these relatively quickly, without going back to the read data and variant-calling. Just move the directory results_raw, change the windowsize in config.yaml, and start the pipeline again exactly as before. I usually do this several times for window sizes 1 kb, 10 kb, 25 kb, 50 kb, 100 kb.
-- If a different subset region for plotting is desired, there is no need to run the pipeline again, just subset the file calls/allstats.txt and call scripts/plot_allstats.R. For example, to plot only assembly sequences larger than 5 Gbp: 
-```seqtk comp data/genome_assembly.fa | awk '{{if($2>5000000) print $1"\t0\t"$2}}' > bigchroms.bed
+- If a different subset region for plotting is desired, there is no need to run the pipeline again, just subset the file calls/allstats.txt and call scripts/plot_allstats.R . For example, to plot only assembly sequences larger than 5 Gbp  
+```
+seqtk comp data/genome_assembly.fa | awk '{{if($2>5000000) print $1"\t0\t"$2}}' > bigchroms.bed
 
 bedtools intersect -wa -a calls/allstats.txt -b bigchroms.bed > subs.txt
 
 Rscript scripts/plot_allstats.R subs.txt bigchroms.pdf
 ```
 - cleaning up / archiving: Once the final stats for all desired windowsizes are produced, it makes sense to clean up large intermediate files. I suggest to keep only the config.yaml, the popmap and samples_reads_map, the results_processed, or if you have a bit of space, also results_raw. I would delete the large .BAM files and intermediate VCF files; in the worst case these can be re-calculated. To clean up in this way, run 
-```rm -rf mapped_reads FB_chunks FB_chunk_VCFs FB_chunk_VCFs_filtered FB_regionsALL.bed normalization_coefficients.txt```
+```
+rm -rf mapped_reads FB_chunks FB_chunk_VCFs FB_chunk_VCFs_filtered FB_regionsALL.bed normalization_coefficients.txt
+```
 - I would also get rid of the hidden .snakemake directory, unless you really need it. It can be quite large/numerous tiny files.
 
 
