@@ -248,9 +248,9 @@ rule merge_filtered_vcfs:
 		"""
 		# MUST NOT USE bcftools concat: it cannot resolve POS that are non-monotonically icreasing (which ca happen at the interval boundaries)
 		# the code below is only slightly modified from freebayes-parallel script: https://github.com/freebayes/freebayes/blob/master/scripts/freebayes-parallel
-		# zcat input.region_vcfs | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
+		# zcat input.region_vcfs | python $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		# zcat alone may complain about too many arguments, so better use find -exec :
-		find FB_chunk_VCFs_filtered/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python2.7 $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
+		find FB_chunk_VCFs_filtered/*.bed.vcf.gz -type f -exec zcat {{}} \\; | python $(which vcffirstheader) | vcfstreamsort -w 10000 | vcfuniq | bgzip -c > {output}
 		"""
 
 
@@ -417,7 +417,7 @@ rule pi_rawstats_M:
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==1) print $1}}' > mpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
+		vcftools --gzvcf {input.gzvcf} --keep mpop_pi --max-missing 0.01 --recode --stdout | python scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
 		rm mpop_pi
 		"""
 
@@ -430,7 +430,7 @@ rule pi_rawstats_F:
 	shell:
 		"""
 		cat {input.popmap} | awk '{{if($2==2) print $1}}' > fpop_pi
-		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --max-missing 0.01 --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
+		vcftools --gzvcf {input.gzvcf} --keep fpop_pi --max-missing 0.01 --recode --stdout | python scripts/make_denominator_and_numerator_for_pi.py | gzip -c > {output}
 		rm fpop_pi
 		"""
 
@@ -490,7 +490,7 @@ rule dxy_rawstats:
 		"results_raw/dxy_raw.txt.gz"		
 	shell:
 		"""
-		zcat {input.gzvcf} | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} | gzip -c > {output}
+		zcat {input.gzvcf} | python scripts/make_denominator_and_numerator_for_dxy.py --popmap {input.popmap} | gzip -c > {output}
 		"""
 
 rule dxy_windowed:
@@ -903,7 +903,7 @@ rule score_XY_gametolog_divergence:
 		echo -e "XY_X_like" > xypop
 		echo -e "XY_Y_like" >> xypop
 
-		vcftools --gzvcf {input} --keep xypop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm | gzip -c > {output}
+		vcftools --gzvcf {input} --keep xypop --recode --stdout | python scripts/make_denominator_and_numerator_for_dxy.py --popmap xypopm | gzip -c > {output}
 		rm xypopm xypop
 		"""
 
@@ -920,7 +920,7 @@ rule score_ZW_gametolog_divergence:
 		echo -e "ZW_W_like" > zwpop
 		echo -e "ZW_Z_like" >> zwpop
 
-		vcftools --gzvcf {input} --keep zwpop --recode --stdout | python2.7 scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm | gzip -c > {output}
+		vcftools --gzvcf {input} --keep zwpop --recode --stdout | python scripts/make_denominator_and_numerator_for_dxy.py --popmap zwpopm | gzip -c > {output}
 		rm zwpopm zwpop
 		"""
 

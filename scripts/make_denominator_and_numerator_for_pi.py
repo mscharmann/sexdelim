@@ -1,17 +1,9 @@
 #!/usr/local/bin/python
 # Python 3
-# vcf_diploid_to_haploid_random.py
-# 21 January 2021
+
 # Mathias Scharmann
 
 
-# usage example
-# python vcf_diploid_to_haploid_random.py --vcf bla.vcf
-
-"""
-takes vcf with diploid genotypes and outputs haploid genotypes, randomly sampling a single allele from each diploid genotype
-=> pseudo-haploids to accomodate the Site Frequency Spectra of diploid selfers to a random-mating-like condition
-"""
 
 
 #import scipy.special
@@ -30,7 +22,7 @@ def alldiffs (inlist):
 					if inlist[i] != inlist[j]:
 						diff += 1
 					seen.add( pairstring )	
-	print len(seen) # this is correct!
+	print (len(seen)) # this is correct!
 	return diff	
 
 ################################## MAIN

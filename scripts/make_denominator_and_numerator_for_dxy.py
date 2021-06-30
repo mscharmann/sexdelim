@@ -1,5 +1,5 @@
 #!/usr/local/bin/python
-# Python 2
+# Python 3
 # 
 # 
 # Mathias Scharmann
@@ -62,7 +62,7 @@ def alldiffs (inlist):
 					if inlist[i] != inlist[j]:
 						diff += 1
 					seen.add( pairstring )	
-	print len(seen) # this is correct!
+	print (len(seen)) # this is correct!
 	return diff	
 
 
