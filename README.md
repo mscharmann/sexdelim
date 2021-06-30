@@ -55,7 +55,7 @@ conda install -c conda-forge r-ggplot2 r-cowplot -y
 
 ### modify prefix of installation path in last line of this file, then
 ```
-conda env create --file delimit_sexregions.2021-02-16.yml
+conda env create --file delimit_sexregions.2021-06-30.yml
 ```
 
 ### get kmerGO

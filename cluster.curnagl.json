@@ -1,0 +1,110 @@
+{
+    "__default__" :
+    {
+        "time" : "04:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "cpu"
+    },
+    "bwa_map" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 12,
+        "RAM_memory" : "20G",
+        "partition" : "cpu"
+    },
+    "freebayes" :
+    {
+        "time" : "02:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "cpu"
+    },
+    "merge_filtered_vcfs" :
+    {
+        "time" : "48:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "20G",
+        "partition" : "cpu"
+    },
+    "VCF_filter_variants_and_invariants" :
+    {
+    	"time" : "00:30:00",
+        "CPUs" : 1,
+        "RAM_memory" : "1G",
+        "partition" : "cpu"
+    },
+    "kmerGO" :
+    {
+        "time" : "48:00:00",
+        "CPUs" : 12,
+        "RAM_memory" : "60G",
+        "partition" : "cpu"
+    },
+	"VCF_get_mean_depth_per_site" :
+    {
+        "time" : "04:00:00",
+        "CPUs" : 16,
+        "RAM_memory" : "5G",
+        "partition" : "cpu"
+    },
+	"LD_plink_raw" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 4,
+        "RAM_memory" : "20G",
+        "partition" : "cpu"
+    },
+	"LD_plink_windows" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 4,
+        "RAM_memory" : "20G",
+        "partition" : "cpu"
+    },
+	"GWAS_plink_raw" :
+    {
+        "time" : "06:00:00",
+        "CPUs" : 4,
+        "RAM_memory" : "20G",
+        "partition" : "cpu"
+    },
+	"pi_rawstats_M" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "cpu"
+    },
+	"pi_rawstats_F" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "cpu"
+    },
+    "dxy_rawstats" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "cpu"
+    },
+    "pseudo_phase_gametologs" :
+    {
+        "time" : "12:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "2G",
+        "partition" : "cpu"
+    },
+    "get_coverage_in_windows" :
+    {
+        "time" : "24:00:00",
+        "CPUs" : 1,
+        "RAM_memory" : "10G",
+        "partition" : "cpu"
+    }
+
+}
+
+
