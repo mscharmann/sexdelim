@@ -85,7 +85,7 @@ wget -P scripts https://gist.githubusercontent.com/travc/0c53df2c8eca81c3ebc3661
 ### config.yaml: provide meta-data and set parameters
 This file should be mostly self-explanatory and also contains some comments. Further important points are:
 - popmap = 2-column tab-sep file listing samples with assignment as 1 (M) or 2 (F)
-- samples_reads_map = a table listing the samples and "mapping" to their corresponding fastq files. Both single and paired-end data can be handled, also mixed. CAUTION: currently, each sample may have at most one file (one pair of read files). If the reads are split into several files (pairs of files), these must be concatenated before start.
+- samples_reads_map = a table listing the samples and "mapping" to their corresponding fastq files. Both absolute paths and paths relative to the working directory should be tolerated. Both single and paired-end data can be handled, also mixed. CAUTION: currently, each sample may have at most one file (one pair of read files). If the reads are split into several files (pairs of files), these must be concatenated before start.
 - genome fasta file path
 - regions_for_plot_bed: a BED file with a region of special interest, e.g. the sex chromosome. The pipeline produces statistics for all genomic windows and then extracts a subset (region). Plots will be made for all genomic windows, and for the subset region. This can be useful if the assembly contains many contigs that would make a messy plot.  
 - windowsize = length of intervals (windows) in which to split all statistics and plots. Most useful values are between 1000 and 100000.

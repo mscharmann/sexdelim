@@ -745,11 +745,11 @@ rule kmerGO:
 		# also, we must concatenate all read files to a single file per sample... 
 		cat {input.popm} | awk 'NF {{if($2==1) print $1",M"; else print $1",F"}}' > traits_sex_for_kmerGO.txt
 		tail -n +2 {input.SamReMap} > nohead
+		sed -i -e :a -e '/^\\n*$/{{$d;N;ba' -e '}}' nohead # this removes eventual empty lines from the end of that file
 		if [ ! -d read_files ] # avoid xxx exists' error when re-running from failed previous attempt
 		then
 			mkdir read_files
 		fi
-		cd read_files
 		while read line; do
 			sid=$( echo $line | awk '{{print $1}}' )
 			f1=$( echo $line | awk '{{print $2}}')
@@ -757,13 +757,12 @@ rule kmerGO:
 			echo $sid $f1 $f2
 			if [ -z "$f2" ]
 			then
-				cat ../$f1 >> ./$sid.fastq.gz 
+				cat $f1 >> read_files/$sid.fastq.gz 
 			else
-				cat ../$f1 >> ./$sid.fastq.gz
-				cat ../$f2 >> ./$sid.fastq.gz	
+				cat $f1 >> read_files/$sid.fastq.gz
+				cat $f2 >> read_files/$sid.fastq.gz	
 			fi
-		done < ../nohead
-		cd ../
+		done < nohead
 		
 		rm nohead
 		
