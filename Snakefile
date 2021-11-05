@@ -715,7 +715,9 @@ rule LD_plink_windows:
 		"""
 		# create windows, sort chroms lexicographically (same as the LD output)
 		seqtk comp {input.fa} | awk '{{print $1"\\t"$2}}' > genomefile.ld.txt
-		bedtools makewindows -w {windowsize} -g genomefile.ld.txt | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n > windows.ld.bed
+		bedtools makewindows -w {windowsize} -g genomefile.ld.txt > tmpldwindows
+		sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n tmpldwindows > windows.ld.bed
+		rm tmpldwindows
 		
 		gunzip --stdout {input.ldraw} > ld_clean.sorted.bed
 		
