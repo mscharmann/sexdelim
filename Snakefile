@@ -695,7 +695,8 @@ rule LD_plink_raw:
 
 		#cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | tail -n +2 | awk '{{ print $1"\\t"$2"\\t"$2"\\t"$5"\\n"$3"\\t"$4"\\t"$4"\\t"$5  }}' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > ../{output}
 		# interpolate the position of the LD value as the midpoint between the two variants from which it is calculated.
-		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | awk '{{if($1==$3) print $1"\\t"int( ($2+$4)/2 )"\\t"int( ($2+$4)/2 )"\\t"$5 }}' | sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n | gzip -c > ../results_raw/ld_clean.sorted.bed.gz
+		cat plink.ld | tr -s ' ' '\\t' | cut -f1,2,4,5,7 | awk '{{if($1==$3) print $1"\\t"int( ($2+$4)/2 )"\\t"int( ($2+$4)/2 )"\\t"$5 }}' > tmp_plink_before_sort
+		sort --parallel {resources.cpus} -S 2G -T . -k1,1 -k2,2n tmp_plink_before_sort | gzip -c > ../results_raw/ld_clean.sorted.bed.gz
 		
 		cd ../
 		rm -r tmpdir_plink_LD
