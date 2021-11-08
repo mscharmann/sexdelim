@@ -92,17 +92,21 @@ This file should be mostly self-explanatory and also contains some comments. Fur
 - VCF_MIN_DEPTH: the default here is 6 (retain all genotypes with at least 6 reads covering the site). I would reduce to as low as 3, but not less.	
 
 
+There are two versions of the pipeline: 
+- Snakefile_varcall_freebayes: slow but possibly more accurate variant calling
+- Snakefile_varcall_bcftools: at least 10 times faster but possibly less accurate variant calling; fine for most purposes.
+
 ### local:
 ```
-snakemake -j24 --keep-going --rerun-incomplete
+snakemake --snakefile Snakefile_varcall_bcftools -j24 --keep-going --rerun-incomplete
 ```
 ### on SLURM cluster:
 ```
-snakemake -j 500 --cluster-config cluster.axiom.json --cluster "sbatch -p {cluster.partition} -t {cluster.time} -c {cluster.CPUs} --mem={cluster.RAM_memory}" --restart-times 3 --keep-going --rerun-incomplete
+snakemake --snakefile Snakefile_varcall_bcftools -j 500 --cluster-config cluster.axiom.json --cluster "sbatch -p {cluster.partition} -t {cluster.time} -c {cluster.CPUs} --mem={cluster.RAM_memory}" --restart-times 3 --keep-going --rerun-incomplete
 ```
 ### on LSF cluster:
 ```
-snakemake -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster.time} -n {cluster.CPUs} -R {cluster.mem_and_span}" --restart-times 3 --keep-going --rerun-incomplete
+snakemake --snakefile Snakefile_varcall_bcftools -j 500 --cluster-config cluster.EULER.json --cluster "bsub -W {cluster.time} -n {cluster.CPUs} -R {cluster.mem_and_span}" --restart-times 3 --keep-going --rerun-incomplete
 ```
 ## post-run
 - Inspect the PDF files and .txt tables with statistics in the directory results_processed.
@@ -118,6 +122,7 @@ Rscript scripts/plot_allstats.R subs.txt bigchroms.pdf
 - cleaning up / archiving: Once the final stats for all desired windowsizes are produced, it makes sense to clean up large intermediate files. I suggest to keep only the config.yaml, the popmap and samples_reads_map, the results_processed, or if you have a bit of space, also results_raw. I would delete the large .BAM files and intermediate VCF files; in the worst case these can be re-calculated. To clean up in this way, run 
 ```
 rm -rf mapped_reads FB_chunks FB_chunk_VCFs FB_chunk_VCFs_filtered FB_regionsALL.bed normalization_coefficients.txt
+rm -rf mapped_reads varcall_chunks varcall_chunk_VCFs varcall_chunk_VCFs_filtered varcall_regionsALL.bed normalization_coefficients.txt
 ```
 - I would also get rid of the hidden .snakemake directory, unless you really need it. It can be quite large/numerous tiny files.
 
