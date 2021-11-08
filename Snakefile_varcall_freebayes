@@ -163,7 +163,7 @@ checkpoint split_ref_for_freebayes:
 	output:
 		directory("FB_chunks")
 	params:
-		chunksize_Mb = config["freebayes_chunksize"]
+		chunksize_Mb = config["varcall_chunksize"]
 	shell:
 		"""
 		samtools faidx {input.ref}
