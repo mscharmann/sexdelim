@@ -173,7 +173,7 @@ checkpoint split_ref_for_varcall:
 		python scripts/split_ref_by_bai_datasize.py -r {input.ref}.fai -L bamlistforsplit --target-data-size {params.chunksize_Mb} > varcall_regionsALL.bed
 		rm bamlistforsplit
 		split --lines=1 varcall_regionsALL.bed varcall_regions_ --numeric-suffixes --suffix-length=6 --additional-suffix=.bed
-		mkdir {output}
+		mkdir -p {output}
 		for i in varcall_regions_* ; do mv $i {output} ; done		
 		"""
 
@@ -293,7 +293,7 @@ rule VCF_filter_variants_and_invariants:
 		
 		# prepare
 		wd=DIR_{wildcards.i}
-		mkdir varcall_chunk_VCFs_filtered/$wd
+		mkdir -p varcall_chunk_VCFs_filtered/$wd
 		cd varcall_chunk_VCFs_filtered/$wd
 		
 		# set filters
@@ -312,8 +312,8 @@ rule VCF_filter_variants_and_invariants:
 		--max-meanDP $MAX_DEPTH --recode --stdout | bgzip -c > tmp.2
 		tabix tmp.2
 		
-		# combine the two VCFs using bcftools concat, also remove several VCF TAGs which can cause errors later for bcftools merge, or are just not relevant anymore:
-		bcftools concat --allow-overlaps tmp.1 tmp.2 | bcftools annotate --remove FORMAT/AD,FORMAT/AO,FORMAT/QA,FORMAT/GL,FORMAT/QR | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > tmp.3
+		# combine the two VCFs using bcftools concat:
+		bcftools concat --allow-overlaps tmp.1 tmp.2 | bcftools view --exclude-uncalled --trim-alt-alleles | bgzip -c > tmp.3
 
 		# split by M and F populations, then filter for missingness in each pop. Thus we get sites that fulfill "MISS" in at least one of either M or F populations.
 		cat ../../{input.popmap} | awk '{{if($2==2) print $1}}' > fpop
@@ -597,7 +597,7 @@ rule GWAS_plink_raw:
 		if [ -d "$DIR" ]; then
 		  rm -r $DIR
 		fi
-		mkdir tmpdir_plink_GWAS
+		mkdir -p tmpdir_plink_GWAS
 		cd tmpdir_plink_GWAS
 
 		cat ../{input.popmap} | awk 'NF {{print $1"\\t"$1"\\t"$2}}' > thepheno
@@ -652,7 +652,7 @@ rule LD_plink_raw:
 		if [ -d "$DIR" ]; then
 		  rm -r $DIR
 		fi
-		mkdir tmpdir_plink_LD
+		mkdir -p tmpdir_plink_LD
 		cd tmpdir_plink_LD
 
 		# apply a MAF filter 0.2 before calculating LD as rare alleles imply very high LD by definition; they are thus useless for our purpose.
